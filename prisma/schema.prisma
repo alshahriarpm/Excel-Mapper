@@ -1,0 +1,86 @@
+// Prisma schema for Bulk Mapper.
+//
+// Runtime queries go through the TRANSACTION pooler (DATABASE_URL, port 6543,
+// pgbouncer=true). Migrations/introspection use the SESSION pooler (DIRECT_URL,
+// port 5432) which supports the features the schema engine needs.
+//
+// IMPORTANT: Prisma is used for DATA ACCESS ONLY. The database schema itself is
+// still owned by supabase/schema.sql (tables, RLS, functions, triggers). Do NOT
+// run `prisma migrate` / `db push` against this project — it would fight the SQL
+// source of truth. Use `prisma generate` (client) only.
+//
+// Columns that reference auth.users (id, created_by) are modelled as plain UUID
+// scalars — the FKs + ON DELETE CASCADE still exist in Postgres; Prisma just
+// doesn't need to know about the auth schema. Auth stays on supabase-js.
+
+generator client {
+  provider      = "prisma-client-js"
+  // "native" for local dev; "rhel-openssl-3.0.x" for Vercel's serverless runtime.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model companies {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  created_by String?  @db.Uuid
+  blocked    Boolean  @default(false)
+}
+
+model profiles {
+  id         String   @id @db.Uuid
+  email      String?
+  full_name  String?
+  role       String   @default("hr")
+  company_id String?  @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  blocked    Boolean  @default(false)
+}
+
+model templates {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id           String   @db.Uuid
+  name                 String
+  description          String?
+  status               String   @default("draft")
+  version              Int      @default(1)
+  target_configuration Json
+  source_configuration Json
+  rules                Json
+  default_rule         Json?
+  unique_target_fields Json
+  output_configuration Json
+  created_at           DateTime @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime @default(now()) @db.Timestamptz(6)
+  created_by           String?  @db.Uuid
+}
+
+model template_versions {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  template_id String   @db.Uuid
+  version     Int
+  snapshot    Json
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  created_by  String?  @db.Uuid
+}
+
+model conversions {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  template_id      String?  @db.Uuid
+  company_id       String   @db.Uuid
+  source_file_name String?
+  template_version Int?
+  total_rows       Int      @default(0)
+  ready_rows       Int      @default(0)
+  incomplete_rows  Int      @default(0)
+  excluded_rows    Int      @default(0)
+  summary          Json
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  created_by       String?  @db.Uuid
+}
