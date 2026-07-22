@@ -8,17 +8,16 @@ const nextConfig = {
   serverExternalPackages: ["exceljs"],
   // ExcelJS runs in the browser (client-side conversion so source data never
   // leaves the user's machine). It references some Node core modules that are
-  // not needed in the browser build; stub them out so webpack does not choke.
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        stream: false,
-        crypto: false,
-      };
-    }
-    return config;
+  // not needed in the browser build; alias them to an empty module so the
+  // client bundle does not choke. Next 16 builds with Turbopack by default,
+  // so these belong under `turbopack.resolveAlias` (the old `webpack` fallback
+  // config is ignored by Turbopack and makes `next build` error out).
+  turbopack: {
+    resolveAlias: {
+      fs: { browser: "./src/lib/empty-module.ts" },
+      stream: { browser: "./src/lib/empty-module.ts" },
+      crypto: { browser: "./src/lib/empty-module.ts" },
+    },
   },
 };
 
