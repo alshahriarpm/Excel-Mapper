@@ -1,4 +1,3 @@
-/** Mapping between Supabase rows (jsonb) and the engine's template types. */
 import type {
   ConversionRule,
   OutputConfiguration,
@@ -16,12 +15,15 @@ export function rowToTemplate(row: TemplateRow): SavedConversionTemplate {
     companyId: row.company_id,
     name: row.name,
     description: row.description ?? undefined,
-    targetConfiguration: row.target_configuration as unknown as TargetWorkbookConfiguration,
-    sourceConfiguration: row.source_configuration as unknown as SourceConfiguration,
+    targetConfiguration:
+      row.target_configuration as unknown as TargetWorkbookConfiguration,
+    sourceConfiguration:
+      row.source_configuration as unknown as SourceConfiguration,
     rules: (row.rules as unknown as ConversionRule[]) ?? [],
     defaultRule: (row.default_rule as unknown as ConversionRule | null) ?? null,
     uniqueTargetFields: (row.unique_target_fields as unknown as string[]) ?? [],
-    outputConfiguration: row.output_configuration as unknown as OutputConfiguration,
+    outputConfiguration:
+      row.output_configuration as unknown as OutputConfiguration,
     status: row.status,
     version: row.version,
     createdAt: row.created_at,
