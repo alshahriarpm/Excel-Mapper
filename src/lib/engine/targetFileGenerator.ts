@@ -55,6 +55,31 @@ function filterRows(rows: ConvertedRow[], mode: OutputExportMode): ConvertedRow[
   return notExcluded; // "all" and "include_incomplete"
 }
 
+function inOutColumnKeys(columns: TargetColumnConfiguration[]): { inKey?: string; outKey?: string } {
+  const inKey = columns.find((c) => c.mapping.kind === "in_time" || c.role === "in_time")?.key;
+  const outKey = columns.find((c) => c.mapping.kind === "out_time" || c.role === "out_time")?.key;
+  return { inKey, outKey };
+}
+
+/**
+ * The rows actually written to the file: the export-mode filter, then a hard
+ * rule — a row with NO Check-In AND NO Check-Out is an empty attendance record
+ * and is never written to the output (regardless of export mode).
+ */
+export function rowsForOutput(
+  rows: ConvertedRow[],
+  mode: OutputExportMode,
+  columns: TargetColumnConfiguration[],
+): ConvertedRow[] {
+  const { inKey, outKey } = inOutColumnKeys(columns);
+  return filterRows(rows, mode).filter((r) => {
+    if (!inKey || !outKey) return true;
+    const inBlank = isBlank(r.cells[inKey]?.value ?? null);
+    const outBlank = isBlank(r.cells[outKey]?.value ?? null);
+    return !(inBlank && outBlank);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Value → typed Excel cell. Dates/times are written as numeric serials with a
 // number format, which is timezone-safe and round-trips cleanly.
@@ -190,7 +215,7 @@ async function generateXlsx(input: GenerateTargetFileInput): Promise<Uint8Array>
   }
 
   // Write converted rows into the data area.
-  const rowsToWrite = filterRows(convertedRows, outputMode);
+  const rowsToWrite = rowsForOutput(convertedRows, outputMode, orderedColumns);
   rowsToWrite.forEach((row, i) => {
     const excelRow = worksheet.getRow(tc.headerRowNumber + 1 + i);
     orderedColumns.forEach((col) => {
@@ -200,6 +225,21 @@ async function generateXlsx(input: GenerateTargetFileInput): Promise<Uint8Array>
     });
     excelRow.commit?.();
   });
+
+  // A bulk-upload template is often pre-formatted with thousands of empty,
+  // data-validated rows (dropdowns out to e.g. row 5000). Those persist in
+  // ExcelJS's internal row store and leave trailing empty rows in the output.
+  // The filled output doesn't need entry dropdowns, so drop ALL data
+  // validations and truncate the row store to exactly the real data.
+  const lastDataRow = tc.headerRowNumber + rowsToWrite.length;
+  const wsInternal = worksheet as unknown as {
+    dataValidations?: { model?: Record<string, unknown> };
+    _rows?: unknown[];
+  };
+  if (wsInternal.dataValidations) wsInternal.dataValidations.model = {};
+  if (Array.isArray(wsInternal._rows) && wsInternal._rows.length > lastDataRow) {
+    wsInternal._rows.length = lastDataRow;
+  }
 
   const buffer = await workbook.xlsx.writeBuffer();
   return new Uint8Array(buffer as ArrayBuffer);
@@ -224,7 +264,7 @@ function generateCsv(input: GenerateTargetFileInput): Uint8Array {
   });
   lines.push(orderedColumns.map((c) => csvEscape(c.header)).join(","));
 
-  filterRows(convertedRows, outputMode).forEach((row) => {
+  rowsForOutput(convertedRows, outputMode, orderedColumns).forEach((row) => {
     lines.push(
       orderedColumns
         .map((col) => csvEscape(formatCellForDisplay(row.cells[col.key]?.value ?? null, col)))
