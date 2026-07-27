@@ -80,6 +80,31 @@ export function rowsForOutput(
   });
 }
 
+/**
+ * Number of contiguous non-empty rows immediately below the header — the
+ * template's instruction row and example rows (e.g. EMP001…). These are kept
+ * verbatim in the output; converted data is written below them. Scanning stops
+ * at the first blank row, so it never walks the thousands of empty
+ * data-validated rows a bulk-upload template carries.
+ */
+function preambleRowCount(
+  worksheet: ExcelJS.Worksheet,
+  headerRowNumber: number,
+  columns: TargetColumnConfiguration[],
+): number {
+  let count = 0;
+  for (let i = 1; i <= 100; i++) {
+    const row = worksheet.getRow(headerRowNumber + i);
+    const hasValue = columns.some((col) => {
+      const v = row.getCell(col.order + 1).value;
+      return v != null && v !== "";
+    });
+    if (!hasValue) break;
+    count++;
+  }
+  return count;
+}
+
 // ---------------------------------------------------------------------------
 // Value → typed Excel cell. Dates/times are written as numeric serials with a
 // number format, which is timezone-safe and round-trips cleanly.
@@ -177,6 +202,9 @@ async function generateXlsx(input: GenerateTargetFileInput): Promise<Uint8Array>
   const orderedColumns = tc.columns.slice().sort((a, b) => a.order - b.order);
 
   let worksheet: ExcelJS.Worksheet;
+  // Rows kept verbatim below the header (the template's instruction + example
+  // rows). Only the snapshot path has any; the reconstructed shell has none.
+  let preamble = 0;
 
   if (tc.workbookSnapshot) {
     // Reload the original workbook to preserve every safe detail.
@@ -185,10 +213,12 @@ async function generateXlsx(input: GenerateTargetFileInput): Promise<Uint8Array>
       workbook.getWorksheet(tc.outputWorksheetName) ??
       workbook.worksheets[tc.outputWorksheetIndex] ??
       workbook.worksheets[0]!;
-    // Remove any sample/data rows below the header so only real data remains.
-    const firstDataRow = tc.headerRowNumber + 1;
+    // Keep the header + the template's instruction/example rows, and drop only
+    // what's below them (any extra placeholders + the empty validated rows).
+    preamble = preambleRowCount(worksheet, tc.headerRowNumber, orderedColumns);
+    const firstDataRow = tc.headerRowNumber + 1 + preamble;
     if (worksheet.rowCount >= firstDataRow) {
-      worksheet.spliceRows(firstDataRow, worksheet.rowCount - tc.headerRowNumber);
+      worksheet.spliceRows(firstDataRow, worksheet.rowCount - firstDataRow + 1);
     }
   } else {
     // No snapshot (e.g. built programmatically): reconstruct the shell.
@@ -214,10 +244,11 @@ async function generateXlsx(input: GenerateTargetFileInput): Promise<Uint8Array>
     }
   }
 
-  // Write converted rows into the data area.
+  // Write converted rows into the data area, below the preserved preamble.
+  const dataStartRow = tc.headerRowNumber + 1 + preamble;
   const rowsToWrite = rowsForOutput(convertedRows, outputMode, orderedColumns);
   rowsToWrite.forEach((row, i) => {
-    const excelRow = worksheet.getRow(tc.headerRowNumber + 1 + i);
+    const excelRow = worksheet.getRow(dataStartRow + i);
     orderedColumns.forEach((col) => {
       const cell = excelRow.getCell(col.order + 1);
       const value = row.cells[col.key]?.value ?? null;
@@ -231,7 +262,7 @@ async function generateXlsx(input: GenerateTargetFileInput): Promise<Uint8Array>
   // ExcelJS's internal row store and leave trailing empty rows in the output.
   // The filled output doesn't need entry dropdowns, so drop ALL data
   // validations and truncate the row store to exactly the real data.
-  const lastDataRow = tc.headerRowNumber + rowsToWrite.length;
+  const lastDataRow = dataStartRow - 1 + rowsToWrite.length;
   const wsInternal = worksheet as unknown as {
     dataValidations?: { model?: Record<string, unknown> };
     _rows?: unknown[];

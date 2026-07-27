@@ -198,7 +198,7 @@ describe("Target-format downloads", () => {
 });
 
 describe("Snapshot round-trip (preserving original formatting)", () => {
-  it("case 32/33/36: reloads the original workbook, keeps widths/worksheet, replaces sample rows", async () => {
+  it("case 32/33/36: reloads the original workbook, keeps widths/worksheet, and preserves the template's example rows above the data", async () => {
     const original = new ExcelJS.Workbook();
     const ws = original.addWorksheet("Attendance");
     ws.getRow(1).values = ["Employee ID*", "Date*", "In Time*", "Out Time*"];
@@ -220,7 +220,40 @@ describe("Snapshot round-trip (preserving original formatting)", () => {
 
     expect(out.getColumn(1).width).toBe(22);
     expect(out.getRow(1).getCell(1).value).toBe("Employee ID*");
-    expect(String(out.getRow(2).getCell(1).value)).toBe("00125");
-    expect(String(out.getRow(2).getCell(1).value)).not.toBe("SAMPLE");
+    // The template's example row is kept verbatim; data is written below it.
+    expect(String(out.getRow(2).getCell(1).value)).toBe("SAMPLE");
+    expect(String(out.getRow(3).getCell(1).value)).toBe("00125");
+  });
+
+  it("keeps the header + instruction + example rows from the target and writes data below them", async () => {
+    const original = new ExcelJS.Workbook();
+    const ws = original.addWorksheet("Attendance");
+    ws.getRow(1).values = ["Employee ID*", "Date*", "In Time*", "Out Time*"];
+    ws.getRow(2).values = ["Unique employee id", "Attendance date", "HH:MM", "HH:MM"]; // instruction
+    ws.getRow(3).values = ["EMP001", "2023-01-01", "09:00 AM", "05:00 PM"]; // example 1
+    ws.getRow(4).values = ["EMP002", "2023-01-02", "09:15", "17:15"]; // example 2
+    ws.getRow(5).values = ["EMP003", "2023-01-03", "09:30 AM", "05:30 PM"]; // example 3
+    const originalBytes = new Uint8Array(
+      (await original.xlsx.writeBuffer()) as ArrayBuffer,
+    );
+    const snapshot = Buffer.from(originalBytes).toString("base64");
+
+    const target = targetConfiguration({ workbookSnapshot: snapshot });
+    const { res } = build(target);
+    const file = await generateTargetFile({
+      targetConfiguration: target,
+      convertedRows: res.rows,
+      outputMode: "all",
+    });
+    const out = (await readBack(file.data)).getWorksheet("Attendance")!;
+
+    // Header + instruction + all 3 examples preserved verbatim (rows 1-5).
+    expect(out.getRow(1).getCell(1).value).toBe("Employee ID*");
+    expect(String(out.getRow(2).getCell(1).value)).toBe("Unique employee id");
+    expect(String(out.getRow(3).getCell(1).value)).toBe("EMP001");
+    expect(String(out.getRow(4).getCell(1).value)).toBe("EMP002");
+    expect(String(out.getRow(5).getCell(1).value)).toBe("EMP003");
+    // Converted data begins on row 6, right after the 4 preamble rows.
+    expect(String(out.getRow(6).getCell(1).value)).toBe("00125");
   });
 });
