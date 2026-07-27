@@ -544,7 +544,7 @@ function buildIssues(rows: ConvertedRow[], _targetColumns: TargetColumnConfigura
   return issues;
 }
 
-function summarize(rows: ConvertedRow[]): ConversionResult["summary"] {
+export function summarize(rows: ConvertedRow[]): ConversionResult["summary"] {
   const has = (r: ConvertedRow, s: RowStatus) => r.status === s || r.warnings.includes(s);
   return {
     total: rows.length,

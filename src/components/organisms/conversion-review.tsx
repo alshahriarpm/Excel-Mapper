@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/atoms/ui/checkbox";
 import { SummaryCard } from "@/components/molecules/summary-card";
 import { StatusBadge } from "@/components/molecules/status-badge";
 import { EmptyState } from "@/components/molecules/empty-state";
-import { runConfigurableAttendanceTransform } from "@/lib/engine/configurableAttendanceTransform";
+import { runConfigurableAttendanceTransform, summarize } from "@/lib/engine/configurableAttendanceTransform";
 import { generateTargetFile, rowsForOutput } from "@/lib/engine/targetFileGenerator";
 import { formatCellForDisplay } from "@/lib/engine/format";
 import { triggerDownload } from "@/lib/download";
@@ -23,6 +23,10 @@ import type {
 } from "@/lib/engine/types";
 
 type Filter = "all" | RowStatus;
+
+// Prefix-group sentinels for IDs that have no leading letters.
+const NUMERIC_PREFIX = "#"; // id starts with a digit / symbol
+const NO_ID_PREFIX = "(no ID)"; // employee-id cell is blank
 
 export function ConversionReview({
   template,
@@ -75,20 +79,26 @@ export function ConversionReview({
       const str = v == null ? "" : String(v).trim();
       const m = str.match(/^([A-Za-z]+)/);
       if (m) return m[1]!.toUpperCase();
-      return str ? "#" : ""; // "#" = numeric/other id; "" = no id
+      return str ? NUMERIC_PREFIX : NO_ID_PREFIX;
     },
     [empKey],
   );
 
+  // Count each prefix over the rows that can actually be written (drops
+  // fully-blank and excluded rows), so a chip's count matches what lands in
+  // the file and every writable row — including blank-ID rows — gets a group.
+  const writableRows = useMemo(
+    () => rowsForOutput(result.rows, "include_incomplete", columns),
+    [result.rows, columns],
+  );
   const prefixCounts = useMemo(() => {
     const m = new Map<string, number>();
-    for (const r of result.rows) {
+    for (const r of writableRows) {
       const p = prefixOf(r);
-      if (p === "") continue;
       m.set(p, (m.get(p) ?? 0) + 1);
     }
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  }, [result.rows, prefixOf]);
+  }, [writableRows, prefixOf]);
 
   const showPrefixFilter = prefixCounts.length >= 2;
   const [selectedPrefixes, setSelectedPrefixes] = useState<Set<string>>(new Set());
@@ -105,7 +115,8 @@ export function ConversionReview({
     });
   }
 
-  // Rows eligible for download: only the selected ID prefixes.
+  // Rows eligible for download: only the selected ID prefixes. When the filter
+  // is off, everything is eligible (identical to the default all-selected set).
   const downloadRows = useMemo(
     () => (showPrefixFilter ? result.rows.filter((r) => selectedPrefixes.has(prefixOf(r))) : result.rows),
     [result.rows, showPrefixFilter, selectedPrefixes, prefixOf],
@@ -145,7 +156,9 @@ export function ConversionReview({
         fileNameOverride,
       });
       triggerDownload(file);
-      onDownloaded?.(mode, result.summary);
+      // Log the counts for what was actually exported (respecting the prefix
+      // filter and export mode), not the full unfiltered conversion.
+      onDownloaded?.(mode, summarize(rowsForOutput(downloadRows, mode, columns)));
     } finally {
       setBusy(false);
       setDlMode(null);
@@ -285,8 +298,14 @@ export function ConversionReview({
                   >
                     <Checkbox checked={on} onCheckedChange={(c) => togglePrefix(p, c === true)} />
                     <span className="font-medium">
-                      {p === "#" ? "0–9" : p}
-                      <span className="text-muted-foreground">*</span>
+                      {p === NO_ID_PREFIX ? (
+                        "No ID"
+                      ) : (
+                        <>
+                          {p === NUMERIC_PREFIX ? "0–9" : p}
+                          <span className="text-muted-foreground">*</span>
+                        </>
+                      )}
                     </span>
                     <span className="text-xs text-muted-foreground">({count})</span>
                   </label>
@@ -327,7 +346,7 @@ export function ConversionReview({
               disabled={busy || readyCount === 0}
               loading={dlMode === "valid_only"}
             >
-              {dlMode !== "valid_only" && <Download className="h-4 w-4" />} Download ready only ({readyCount})
+              <Download className="h-4 w-4" /> Download ready only ({readyCount})
             </Button>
             <Button
               variant="outline"

@@ -203,7 +203,10 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
         setNewPw("");
         toast.success("Password updated", { description: targetEmail });
       } catch (e) {
-        setPwError(e instanceof Error ? e.message : "Could not update the password.");
+        const msg = e instanceof Error ? e.message : "Could not update the password.";
+        setPwError(msg);
+        // Also surface via toast in case the dialog was dismissed mid-request.
+        toast.error("Password not updated", { description: msg });
       } finally {
         setBusyKey(null);
       }
@@ -360,7 +363,7 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
         </div>
       </CardContent>
 
-      <Dialog open={!!pwUser} onOpenChange={(o) => !o && setPwUser(null)}>
+      <Dialog open={!!pwUser} onOpenChange={(o) => !o && !pending && setPwUser(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Change password</DialogTitle>
@@ -389,7 +392,7 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
+      <Dialog open={!!toDelete} onOpenChange={(o) => !o && !pending && setToDelete(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete this account?</DialogTitle>
@@ -412,7 +415,7 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
       <Dialog
         open={confirmCompanyDelete}
         onOpenChange={(o) => {
-          if (!o) {
+          if (!o && !pending) {
             setConfirmCompanyDelete(false);
             setForceDelete(false);
           }

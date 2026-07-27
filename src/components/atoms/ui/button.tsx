@@ -49,7 +49,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     }
     return (
       <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
+        className={cn(
+          buttonVariants({ variant, size, className }),
+          // While the spinner shows, hide any decorative leading icon so we
+          // never render spinner + icon side by side.
+          loading && "[&>svg:not(.animate-spin)]:hidden",
+        )}
         ref={ref}
         disabled={disabled || loading}
         {...props}
