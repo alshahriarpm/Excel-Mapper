@@ -225,6 +225,34 @@ describe("Snapshot round-trip (preserving original formatting)", () => {
     expect(String(out.getRow(3).getCell(1).value)).toBe("00125");
   });
 
+  it("removes worksheet protection so the downloaded sheet is editable", async () => {
+    const original = new ExcelJS.Workbook();
+    const ws = original.addWorksheet("Attendance");
+    ws.getRow(1).values = ["Employee ID*", "Date*", "In Time*", "Out Time*"];
+    ws.getRow(2).values = ["SAMPLE", "01/01/2000", "0:00", "0:00"];
+    await ws.protect("locked", {});
+    const originalBytes = new Uint8Array(
+      (await original.xlsx.writeBuffer()) as ArrayBuffer,
+    );
+    // sheetProtection is runtime-only (absent from ExcelJS's type defs).
+    const sheetProtected = (w: ExcelJS.Worksheet) =>
+      Boolean((w as unknown as { sheetProtection?: { sheet?: boolean } }).sheetProtection?.sheet);
+    // Sanity: the source snapshot really is protected.
+    const check = await readBack(originalBytes);
+    expect(sheetProtected(check.getWorksheet("Attendance")!)).toBe(true);
+
+    const snapshot = Buffer.from(originalBytes).toString("base64");
+    const target = targetConfiguration({ workbookSnapshot: snapshot });
+    const { res } = build(target);
+    const file = await generateTargetFile({
+      targetConfiguration: target,
+      convertedRows: res.rows,
+      outputMode: "all",
+    });
+    const out = (await readBack(file.data)).getWorksheet("Attendance")!;
+    expect(sheetProtected(out)).toBe(false);
+  });
+
   it("keeps the header + instruction + example rows from the target and writes data below them", async () => {
     const original = new ExcelJS.Workbook();
     const ws = original.addWorksheet("Attendance");

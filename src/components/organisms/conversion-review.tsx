@@ -126,10 +126,12 @@ export function ConversionReview({
     [downloadRows, columns],
   );
 
+  // The review table follows the Employee-ID group selection too (downloadRows
+  // already applies it), so what you see matches what you download.
   const visibleRows = useMemo(() => {
-    if (filter === "all") return result.rows;
-    return result.rows.filter((r) => r.status === filter || r.warnings.includes(filter));
-  }, [result.rows, filter]);
+    if (filter === "all") return downloadRows;
+    return downloadRows.filter((r) => r.status === filter || r.warnings.includes(filter));
+  }, [downloadRows, filter]);
 
   // Pagination — back to page 1 whenever the filter, page size, or data changes.
   useEffect(() => setPage(1), [filter, pageSize, visibleRows.length]);
@@ -142,7 +144,9 @@ export function ConversionReview({
   const rangeStart = visibleRows.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
   const rangeEnd = Math.min(safePage * pageSize, visibleRows.length);
 
-  const s = result.summary;
+  // Status counts reflect the selected ID groups, keeping the cards, table and
+  // download panel consistent as groups are ticked/unticked.
+  const s = useMemo(() => summarize(downloadRows), [downloadRows]);
 
   async function download(mode: OutputExportMode) {
     setBusy(true);

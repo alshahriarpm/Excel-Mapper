@@ -209,6 +209,9 @@ async function generateXlsx(input: GenerateTargetFileInput): Promise<Uint8Array>
   if (tc.workbookSnapshot) {
     // Reload the original workbook to preserve every safe detail.
     await workbook.xlsx.load(base64ToBytes(tc.workbookSnapshot) as unknown as ExcelJS.Buffer);
+    // Bulk-upload templates often lock the data sheet; the filled output should
+    // be freely editable, so drop worksheet protection everywhere.
+    workbook.worksheets.forEach((ws) => ws.unprotect());
     worksheet =
       workbook.getWorksheet(tc.outputWorksheetName) ??
       workbook.worksheets[tc.outputWorksheetIndex] ??
