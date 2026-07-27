@@ -1,18 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Clock, Download, FileWarning, Layers, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/atoms/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/atoms/ui/card";
+import { Checkbox } from "@/components/atoms/ui/checkbox";
 import { SummaryCard } from "@/components/molecules/summary-card";
 import { StatusBadge } from "@/components/molecules/status-badge";
 import { EmptyState } from "@/components/molecules/empty-state";
 import { runConfigurableAttendanceTransform } from "@/lib/engine/configurableAttendanceTransform";
-import { generateTargetFile } from "@/lib/engine/targetFileGenerator";
+import { generateTargetFile, rowsForOutput } from "@/lib/engine/targetFileGenerator";
 import { formatCellForDisplay } from "@/lib/engine/format";
 import { triggerDownload } from "@/lib/download";
+import { cn } from "@/lib/utils";
 import type {
   ConversionResult,
+  ConvertedRow,
   OutputExportMode,
   RowStatus,
   SavedConversionTemplate,
@@ -47,12 +50,70 @@ export function ConversionReview({
 
   const [filter, setFilter] = useState<Filter>("all");
   const [busy, setBusy] = useState(false);
+  const [dlMode, setDlMode] = useState<OutputExportMode | null>(null);
   const [pageSize, setPageSize] = useState(50);
   const [page, setPage] = useState(1);
 
   const columns = useMemo(
     () => template.targetConfiguration.columns.slice().sort((a, b) => a.order - b.order),
     [template],
+  );
+
+  // --- Employee-ID prefix filter --------------------------------------------
+  // The output column that carries the Employee ID (direct copy of the source
+  // employee column). Its value's leading letters are the "prefix".
+  const empKey = useMemo(() => {
+    const col = columns.find(
+      (c) => c.mapping.kind === "direct" && c.mapping.sourceColumn === template.sourceConfiguration.employeeColumn,
+    );
+    return col?.key;
+  }, [columns, template.sourceConfiguration.employeeColumn]);
+
+  const prefixOf = useCallback(
+    (row: ConvertedRow): string => {
+      const v = empKey ? row.cells[empKey]?.value : null;
+      const str = v == null ? "" : String(v).trim();
+      const m = str.match(/^([A-Za-z]+)/);
+      if (m) return m[1]!.toUpperCase();
+      return str ? "#" : ""; // "#" = numeric/other id; "" = no id
+    },
+    [empKey],
+  );
+
+  const prefixCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of result.rows) {
+      const p = prefixOf(r);
+      if (p === "") continue;
+      m.set(p, (m.get(p) ?? 0) + 1);
+    }
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [result.rows, prefixOf]);
+
+  const showPrefixFilter = prefixCounts.length >= 2;
+  const [selectedPrefixes, setSelectedPrefixes] = useState<Set<string>>(new Set());
+  // Default: all prefixes selected; reset whenever the set of prefixes changes.
+  useEffect(() => {
+    setSelectedPrefixes(new Set(prefixCounts.map(([p]) => p)));
+  }, [prefixCounts]);
+  function togglePrefix(p: string, on: boolean) {
+    setSelectedPrefixes((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(p);
+      else next.delete(p);
+      return next;
+    });
+  }
+
+  // Rows eligible for download: only the selected ID prefixes.
+  const downloadRows = useMemo(
+    () => (showPrefixFilter ? result.rows.filter((r) => selectedPrefixes.has(prefixOf(r))) : result.rows),
+    [result.rows, showPrefixFilter, selectedPrefixes, prefixOf],
+  );
+  const readyCount = useMemo(() => rowsForOutput(downloadRows, "valid_only", columns).length, [downloadRows, columns]);
+  const includeCount = useMemo(
+    () => rowsForOutput(downloadRows, "include_incomplete", columns).length,
+    [downloadRows, columns],
   );
 
   const visibleRows = useMemo(() => {
@@ -75,10 +136,11 @@ export function ConversionReview({
 
   async function download(mode: OutputExportMode) {
     setBusy(true);
+    setDlMode(mode);
     try {
       const file = await generateTargetFile({
         targetConfiguration: template.targetConfiguration,
-        convertedRows: result.rows,
+        convertedRows: downloadRows,
         outputMode: mode,
         fileNameOverride,
       });
@@ -86,6 +148,7 @@ export function ConversionReview({
       onDownloaded?.(mode, result.summary);
     } finally {
       setBusy(false);
+      setDlMode(null);
     }
   }
 
@@ -188,6 +251,52 @@ export function ConversionReview({
         </CardContent>
       </Card>
 
+      {/* Employee-ID prefix filter */}
+      {showPrefixFilter && (
+        <Card>
+          <CardHeader className="flex-row items-center justify-between gap-3">
+            <CardTitle className="text-base">
+              Employee ID groups{" "}
+              <span className="font-normal text-muted-foreground">({selectedPrefixes.size} of {prefixCounts.length})</span>
+            </CardTitle>
+            <div className="flex gap-1">
+              <Button variant="ghost" size="sm" onClick={() => setSelectedPrefixes(new Set(prefixCounts.map(([p]) => p)))}>
+                Select all
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedPrefixes(new Set())}>
+                Clear
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Only the ticked ID groups are written to the downloaded file.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {prefixCounts.map(([p, count]) => {
+                const on = selectedPrefixes.has(p);
+                return (
+                  <label
+                    key={p}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors",
+                      on ? "border-primary bg-primary/5" : "border-border",
+                    )}
+                  >
+                    <Checkbox checked={on} onCheckedChange={(c) => togglePrefix(p, c === true)} />
+                    <span className="font-medium">
+                      {p === "#" ? "0–9" : p}
+                      <span className="text-muted-foreground">*</span>
+                    </span>
+                    <span className="text-xs text-muted-foreground">({count})</span>
+                  </label>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Download panel */}
       <Card>
         <CardHeader>
@@ -209,20 +318,30 @@ export function ConversionReview({
             </div>
             <div className="min-w-0">
               <dt className="text-muted-foreground">Ready records</dt>
-              <dd className="font-medium">{s.ready} of {s.total}</dd>
+              <dd className="font-medium">{readyCount} of {s.total}</dd>
             </div>
           </dl>
           <div className="flex flex-wrap gap-3">
-            <Button onClick={() => download("valid_only")} disabled={busy}>
-              <Download className="h-4 w-4" /> Download ready only ({s.ready})
+            <Button
+              onClick={() => download("valid_only")}
+              disabled={busy || readyCount === 0}
+              loading={dlMode === "valid_only"}
+            >
+              {dlMode !== "valid_only" && <Download className="h-4 w-4" />} Download ready only ({readyCount})
             </Button>
-            <Button variant="outline" onClick={() => download("include_incomplete")} disabled={busy}>
-              Include incomplete ({s.total - s.excluded})
+            <Button
+              variant="outline"
+              onClick={() => download("include_incomplete")}
+              disabled={busy || includeCount === 0}
+              loading={dlMode === "include_incomplete"}
+            >
+              Include incomplete ({includeCount})
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
             The downloaded file uses your saved target format, worksheet, column order and filename.
-            A blank Check-In always produces a blank Check-Out.
+            Rows with no Check-In and no Check-Out are skipped; a blank Check-In always produces a blank Check-Out.
+            {showPrefixFilter ? " Only selected ID groups are included." : ""}
           </p>
         </CardContent>
       </Card>

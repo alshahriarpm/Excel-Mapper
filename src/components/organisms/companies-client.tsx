@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Building2, Plus, UserPlus, Ban, CircleCheck, Trash2 } from "lucide-react";
+import { Building2, Plus, UserPlus, Ban, CircleCheck, Trash2, KeyRound } from "lucide-react";
 import { Button } from "@/components/atoms/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/atoms/ui/card";
 import { Input } from "@/components/atoms/ui/input";
@@ -19,10 +19,12 @@ import {
   DialogTitle,
 } from "@/components/atoms/ui/dialog";
 import { EmptyState } from "@/components/molecules/empty-state";
+import { PasswordInput } from "@/components/molecules/password-input";
 import {
   createCompany,
   createHrUser,
   setUserBlocked,
+  setUserPassword,
   deleteUser,
   setCompanyBlocked,
   deleteCompany,
@@ -75,7 +77,7 @@ export function CompaniesClient({
             <Label>Company name</Label>
             <Input value={newCompany} onChange={(e) => setNewCompany(e.target.value)} placeholder="e.g. Company A" />
           </div>
-          <Button onClick={addCompany} disabled={pending || !newCompany.trim()}>
+          <Button onClick={addCompany} disabled={pending || !newCompany.trim()} loading={pending}>
             <Plus className="h-4 w-4" /> Add
           </Button>
         </CardContent>
@@ -106,21 +108,30 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
   const [toDelete, setToDelete] = useState<CompanyUser | null>(null);
   const [confirmCompanyDelete, setConfirmCompanyDelete] = useState(false);
   const [forceDelete, setForceDelete] = useState(false);
+  const [pwUser, setPwUser] = useState<CompanyUser | null>(null);
+  const [newPw, setNewPw] = useState("");
+  const [pwError, setPwError] = useState("");
+  // Which action is in flight, so only that button shows a spinner.
+  const [busyKey, setBusyKey] = useState<string | null>(null);
 
   function toggleCompanyBlock() {
     setError("");
+    setBusyKey("companyBlock");
     startTransition(async () => {
       try {
         await setCompanyBlocked(company.id, !company.blocked);
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not update the company.");
+      } finally {
+        setBusyKey(null);
       }
     });
   }
 
   function confirmDeleteCompany() {
     setError("");
+    setBusyKey("companyDelete");
     startTransition(async () => {
       try {
         await deleteCompany(company.id, forceDelete);
@@ -129,18 +140,23 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not delete the company.");
+      } finally {
+        setBusyKey(null);
       }
     });
   }
 
   function toggleBlock(user: CompanyUser) {
     setError("");
+    setBusyKey(`block:${user.id}`);
     startTransition(async () => {
       try {
         await setUserBlocked(user.id, !user.blocked);
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not update the user.");
+      } finally {
+        setBusyKey(null);
       }
     });
   }
@@ -149,6 +165,7 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
     if (!toDelete) return;
     const id = toDelete.id;
     setError("");
+    setBusyKey("userDelete");
     startTransition(async () => {
       try {
         await deleteUser(id);
@@ -156,6 +173,39 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not delete the user.");
+      } finally {
+        setBusyKey(null);
+      }
+    });
+  }
+
+  function openChangePassword(user: CompanyUser) {
+    setPwUser(user);
+    setNewPw("");
+    setPwError("");
+  }
+
+  function confirmChangePassword() {
+    if (!pwUser) return;
+    const weak = validatePassword(newPw);
+    if (weak) {
+      setPwError(weak);
+      return;
+    }
+    const targetEmail = pwUser.email ?? "";
+    const id = pwUser.id;
+    setPwError("");
+    setBusyKey("changePw");
+    startTransition(async () => {
+      try {
+        await setUserPassword(id, newPw);
+        setPwUser(null);
+        setNewPw("");
+        toast.success("Password updated", { description: targetEmail });
+      } catch (e) {
+        setPwError(e instanceof Error ? e.message : "Could not update the password.");
+      } finally {
+        setBusyKey(null);
       }
     });
   }
@@ -172,6 +222,7 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
     }
     setError("");
     const createdEmail = email.trim();
+    setBusyKey("addUser");
     startTransition(async () => {
       try {
         await createHrUser({ email, password, fullName, companyId: company.id });
@@ -182,6 +233,8 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not create the user.");
+      } finally {
+        setBusyKey(null);
       }
     });
   }
@@ -200,6 +253,7 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
             size="sm"
             onClick={toggleCompanyBlock}
             disabled={pending}
+            loading={busyKey === "companyBlock"}
             title={company.blocked ? "Unblock this company" : "Block this company and its users"}
           >
             {company.blocked ? (
@@ -218,6 +272,7 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
             className="text-destructive"
             onClick={() => setConfirmCompanyDelete(true)}
             disabled={pending}
+            loading={busyKey === "companyDelete"}
             title="Delete this company"
           >
             <Trash2 className="h-3.5 w-3.5" /> Delete
@@ -247,8 +302,18 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={() => openChangePassword(u)}
+                    disabled={pending}
+                    title="Change this user's password"
+                  >
+                    <KeyRound className="h-3.5 w-3.5" /> Password
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => toggleBlock(u)}
                     disabled={pending}
+                    loading={busyKey === `block:${u.id}`}
                     title={u.blocked ? "Unblock this account" : "Block this account"}
                   >
                     {u.blocked ? (
@@ -284,16 +349,45 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
           <div className="grid gap-2 sm:grid-cols-3">
             <Input placeholder="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
             <Input type="email" placeholder="email@company.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <Input type="password" placeholder={`Temp password (${MIN_PASSWORD_LENGTH}+ characters)`} value={password} onChange={(e) => setPassword(e.target.value)} />
+            <PasswordInput placeholder={`Temp password (${MIN_PASSWORD_LENGTH}+ characters)`} value={password} onChange={setPassword} />
           </div>
           <div className="mt-2 flex items-center gap-3">
-            <Button size="sm" onClick={addUser} disabled={pending}>
+            <Button size="sm" onClick={addUser} disabled={pending} loading={busyKey === "addUser"}>
               Create user
             </Button>
             {error && <span className="text-sm text-destructive">{error}</span>}
           </div>
         </div>
       </CardContent>
+
+      <Dialog open={!!pwUser} onOpenChange={(o) => !o && setPwUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change password</DialogTitle>
+            <DialogDescription>
+              Set a new password for {pwUser?.email}. They can sign in with it immediately. Existing
+              passwords are hashed and can never be shown.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label>New password</Label>
+            <PasswordInput
+              placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+              value={newPw}
+              onChange={setNewPw}
+            />
+            {pwError && <p className="text-sm text-destructive">{pwError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPwUser(null)} disabled={pending}>
+              Cancel
+            </Button>
+            <Button onClick={confirmChangePassword} disabled={pending || !newPw} loading={busyKey === "changePw"}>
+              Update password
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
         <DialogContent>
@@ -308,7 +402,7 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
             <Button variant="ghost" onClick={() => setToDelete(null)} disabled={pending}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={confirmDelete} disabled={pending}>
+            <Button variant="destructive" onClick={confirmDelete} disabled={pending} loading={busyKey === "userDelete"}>
               Delete account
             </Button>
           </DialogFooter>
@@ -347,7 +441,7 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
             <Button variant="ghost" onClick={() => setConfirmCompanyDelete(false)} disabled={pending}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={confirmDeleteCompany} disabled={pending}>
+            <Button variant="destructive" onClick={confirmDeleteCompany} disabled={pending} loading={busyKey === "companyDelete"}>
               {forceDelete ? "Force delete everything" : "Delete company"}
             </Button>
           </DialogFooter>

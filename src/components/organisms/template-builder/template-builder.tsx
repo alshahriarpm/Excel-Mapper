@@ -101,6 +101,7 @@ export function TemplateBuilder({
   const set = useBuilderStore((s) => s.patch);
 
   const [busy, setBusy] = useState(false);
+  const [saveMode, setSaveMode] = useState<SavedConversionTemplate["status"] | null>(null);
   const [error, setError] = useState("");
 
   // Keep the parsed workbooks so worksheet/header changes can re-derive columns.
@@ -250,6 +251,7 @@ export function TemplateBuilder({
 
   async function save(status: SavedConversionTemplate["status"]) {
     setBusy(true);
+    setSaveMode(status);
     setError("");
     try {
       const finalPayload = { ...payload, status };
@@ -266,6 +268,7 @@ export function TemplateBuilder({
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong while saving.");
       setBusy(false);
+      setSaveMode(null);
     }
   }
 
@@ -310,10 +313,10 @@ export function TemplateBuilder({
             </Button>
           ) : (
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => save("draft")} disabled={busy || !draft.name}>
+              <Button variant="outline" onClick={() => save("draft")} disabled={busy || !draft.name} loading={saveMode === "draft"}>
                 Save as draft
               </Button>
-              <Button onClick={() => save("active")} disabled={busy || !draft.name}>
+              <Button onClick={() => save("active")} disabled={busy || !draft.name} loading={saveMode === "active"}>
                 Publish template
               </Button>
             </div>

@@ -162,6 +162,22 @@ export async function setUserBlocked(userId: string, blocked: boolean): Promise<
   revalidatePath("/admin/companies");
 }
 
+/**
+ * Reset an HR user's password (super-admin only). Existing passwords are hashed
+ * and can never be read back — this overwrites it with a new value.
+ */
+export async function setUserPassword(userId: string, newPassword: string): Promise<void> {
+  const weak = validatePassword(newPassword);
+  if (weak) throw new Error(weak);
+  await requireSuperAdmin();
+
+  if (DEMO) return; // demo accounts have no real auth backend
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(userId, { password: newPassword });
+  if (error) throw new Error(error.message);
+}
+
 /** Permanently delete a user account (profile cascades from auth.users). */
 export async function deleteUser(userId: string): Promise<void> {
   const session = await requireSuperAdmin();
