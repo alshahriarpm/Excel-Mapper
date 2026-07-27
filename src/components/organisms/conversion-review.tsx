@@ -54,7 +54,6 @@ export function ConversionReview({
 
   const [filter, setFilter] = useState<Filter>("all");
   const [busy, setBusy] = useState(false);
-  const [dlMode, setDlMode] = useState<OutputExportMode | null>(null);
   const [pageSize, setPageSize] = useState(50);
   const [page, setPage] = useState(1);
 
@@ -147,7 +146,6 @@ export function ConversionReview({
 
   async function download(mode: OutputExportMode) {
     setBusy(true);
-    setDlMode(mode);
     try {
       const file = await generateTargetFile({
         targetConfiguration: template.targetConfiguration,
@@ -161,7 +159,6 @@ export function ConversionReview({
       onDownloaded?.(mode, summarize(rowsForOutput(downloadRows, mode, columns)));
     } finally {
       setBusy(false);
-      setDlMode(null);
     }
   }
 
@@ -336,30 +333,23 @@ export function ConversionReview({
               <dd className="truncate font-medium" title={tc.outputWorksheetName}>{tc.outputWorksheetName}</dd>
             </div>
             <div className="min-w-0">
-              <dt className="text-muted-foreground">Ready records</dt>
-              <dd className="font-medium">{readyCount} of {s.total}</dd>
+              <dt className="text-muted-foreground">Records to export</dt>
+              <dd className="font-medium">{includeCount} of {s.total}</dd>
             </div>
           </dl>
           <div className="flex flex-wrap gap-3">
             <Button
-              onClick={() => download("valid_only")}
-              disabled={busy || readyCount === 0}
-              loading={dlMode === "valid_only"}
-            >
-              <Download className="h-4 w-4" /> Download ready only ({readyCount})
-            </Button>
-            <Button
-              variant="outline"
               onClick={() => download("include_incomplete")}
               disabled={busy || includeCount === 0}
-              loading={dlMode === "include_incomplete"}
+              loading={busy}
             >
-              Include incomplete ({includeCount})
+              <Download className="h-4 w-4" /> Download template ({includeCount})
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
             The downloaded file uses your saved target format, worksheet, column order and filename.
-            Rows with no Check-In and no Check-Out are skipped; a blank Check-In always produces a blank Check-Out.
+            Every record with a Check-In or a Check-Out is included ({readyCount} ready and{" "}
+            {includeCount - readyCount} incomplete); rows with no Check-In and no Check-Out are skipped.
             {showPrefixFilter ? " Only selected ID groups are included." : ""}
           </p>
         </CardContent>
