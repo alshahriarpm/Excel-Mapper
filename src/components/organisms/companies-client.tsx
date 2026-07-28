@@ -111,7 +111,6 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
   const [pwUser, setPwUser] = useState<CompanyUser | null>(null);
   const [newPw, setNewPw] = useState("");
   const [pwError, setPwError] = useState("");
-  // Which action is in flight, so only that button shows a spinner.
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
   function toggleCompanyBlock() {
@@ -205,7 +204,6 @@ function CompanyCard({ company, users }: { company: CompanyLite; users: CompanyU
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Could not update the password.";
         setPwError(msg);
-        // Also surface via toast in case the dialog was dismissed mid-request.
         toast.error("Password not updated", { description: msg });
       } finally {
         setBusyKey(null);

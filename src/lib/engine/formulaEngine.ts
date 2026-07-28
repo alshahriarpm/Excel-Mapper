@@ -1,29 +1,8 @@
-/**
- * A small, safe formula evaluator for power users. NO eval() is used.
- *
- * Supported syntax:
- *   - Column references:   [Column Name]   (name comes from configuration)
- *   - String literals:     "text" or 'text'
- *   - Number literals:     42, 3.14
- *   - Concatenation:       a & b
- *   - Arithmetic:          + - * /
- *   - Comparison:          = <> < > <= >=
- *   - Function calls:      NAME(arg, arg, ...)
- *
- * Built-in functions include NEXT_CALENDAR_DAY / PREV_CALENDAR_DAY, whose
- * employee/date/return column names all come from the expression (i.e. from
- * configuration) — never hardcoded.
- */
 import type { CellValue } from "./types";
 import { cellToString, isBlank } from "./normalize";
 
 export type FormulaContext = {
-  /** Read a column value from the current row. */
   getColumn: (name: string) => CellValue;
-  /**
-   * Look up a value from the same employee's date +/- offset days.
-   * Returns null when the related row is missing or ambiguous.
-   */
   lookupCalendarDay: (
     employeeColumn: string,
     dateColumn: string,
@@ -32,9 +11,6 @@ export type FormulaContext = {
   ) => CellValue;
 };
 
-// ---------------------------------------------------------------------------
-// Tokenizer
-// ---------------------------------------------------------------------------
 
 type Token =
   | { t: "num"; v: number }
@@ -115,9 +91,6 @@ function tokenize(input: string): Token[] {
 
 export class FormulaError extends Error {}
 
-// ---------------------------------------------------------------------------
-// Parser (recursive descent with precedence) → AST
-// ---------------------------------------------------------------------------
 
 type Node =
   | { k: "num"; v: number }
@@ -169,7 +142,7 @@ function parse(tokens: Token[]): Node {
       }
       case "ident": {
         if (peek()?.t === "lparen") {
-          next(); // consume (
+          next();
           const args: Node[] = [];
           if (peek()?.t !== "rparen") {
             args.push(parseExpression());
@@ -181,11 +154,9 @@ function parse(tokens: Token[]): Node {
           if (next()?.t !== "rparen") throw new FormulaError("Expected )");
           return { k: "call", name: tk.v.toUpperCase(), args };
         }
-        // A bare identifier is treated as a column reference for convenience.
         return { k: "col", v: tk.v };
       }
       case "op":
-        // Unary minus.
         if (tk.v === "-") {
           const operand = parsePrimary();
           return { k: "bin", op: "-", l: { k: "num", v: 0 }, r: operand };
@@ -201,9 +172,6 @@ function parse(tokens: Token[]): Node {
   return result;
 }
 
-// ---------------------------------------------------------------------------
-// Evaluator
-// ---------------------------------------------------------------------------
 
 function toNumber(v: CellValue): number {
   if (typeof v === "number") return v;
@@ -256,7 +224,6 @@ function truthy(v: CellValue): boolean {
 function evalCall(node: Extract<Node, { k: "call" }>, ctx: FormulaContext): CellValue {
   const args = node.args;
   const arg = (i: number): CellValue => (i < args.length ? evalNode(args[i]!, ctx) : null);
-  // A literal column name argument (used by lookups) without evaluating it.
   const rawColName = (i: number): string => {
     const a = args[i];
     if (!a) throw new FormulaError(`${node.name}: missing argument ${i + 1}`);
@@ -291,13 +258,11 @@ function evalCall(node: Extract<Node, { k: "call" }>, ctx: FormulaContext): Cell
   }
 }
 
-/** Compile an expression once, evaluate many times against different rows. */
 export function compileFormula(expression: string): (ctx: FormulaContext) => CellValue {
   const ast = parse(tokenize(expression));
   return (ctx: FormulaContext) => evalNode(ast, ctx);
 }
 
-/** Convenience one-shot evaluation. */
 export function evaluateFormula(expression: string, ctx: FormulaContext): CellValue {
   return compileFormula(expression)(ctx);
 }

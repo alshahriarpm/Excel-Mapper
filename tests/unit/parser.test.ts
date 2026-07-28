@@ -10,7 +10,6 @@ async function makeXlsx(build: (ws: ExcelJS.Worksheet) => void, name = "Attendan
   return new Uint8Array((await wb.xlsx.writeBuffer()) as ArrayBuffer);
 }
 
-/** Build a real legacy .xls (BIFF8) workbook via SheetJS. */
 function makeXls(aoa: unknown[][], name = "Sheet1"): Uint8Array {
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
@@ -80,7 +79,6 @@ describe("Workbook parsing", () => {
     ]);
     const parsed = await parseWorkbook(bytes, "old.xls");
     expect(parsed.fileType).toBe("xls");
-    // No byte snapshot for .xls — the generator rebuilds from config.
     expect(parsed.workbookSnapshot).toBeUndefined();
     const sheet = parsed.sheets[parsed.suggestedWorksheet]!;
     expect(sheet.columns.map((c) => c.header)).toEqual([

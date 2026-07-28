@@ -39,11 +39,6 @@ export async function createCompany(name: string): Promise<string> {
   return company.id;
 }
 
-/**
- * Create an HR user for a company. Uses the Supabase Auth admin API so the
- * account is provisioned server-side; the DB trigger creates their profile
- * (role=hr) from the user metadata.
- */
 export async function createHrUser(input: {
   email: string;
   password: string;
@@ -83,7 +78,6 @@ export async function listCompanyUsers(companyId: string) {
   return rows.map((u) => ({ ...u, role: u.role as UserRole }));
 }
 
-/** Block or unblock a whole company (locks out all its HR users). */
 export async function setCompanyBlocked(companyId: string, blocked: boolean): Promise<void> {
   await requireSuperAdmin();
   if (DEMO) {
@@ -95,13 +89,6 @@ export async function setCompanyBlocked(companyId: string, blocked: boolean): Pr
   revalidatePath("/admin/companies");
 }
 
-/**
- * Delete a company.
- *  - Default (guarded): refuses while it still has users or templates, so
- *    nothing is silently orphaned. Remove those first.
- *  - force = true: deletes the company AND everything under it — its HR users
- *    (auth accounts), templates, versions, and conversion history.
- */
 export async function deleteCompany(companyId: string, force = false): Promise<void> {
   await requireSuperAdmin();
 
@@ -126,8 +113,6 @@ export async function deleteCompany(companyId: string, force = false): Promise<v
       );
     }
   } else {
-    // Force: delete the company's HR auth accounts. Templates, versions and
-    // conversions are removed automatically by ON DELETE CASCADE.
     const hrUsers = await prisma.profiles.findMany({
       where: { company_id: companyId, role: "hr" },
       select: { id: true },
@@ -142,7 +127,6 @@ export async function deleteCompany(companyId: string, force = false): Promise<v
   revalidatePath("/admin/companies");
 }
 
-/** Block or unblock a user: bans them in Supabase Auth and mirrors the flag. */
 export async function setUserBlocked(userId: string, blocked: boolean): Promise<void> {
   const session = await requireSuperAdmin();
   if (userId === session.userId) throw new Error("You can't block your own account.");
@@ -155,30 +139,25 @@ export async function setUserBlocked(userId: string, blocked: boolean): Promise<
 
   const admin = createAdminClient();
   const { error: banErr } = await admin.auth.admin.updateUserById(userId, {
-    ban_duration: blocked ? "876000h" : "none", // ~100 years, or lift the ban
+    ban_duration: blocked ? "876000h" : "none",
   });
   if (banErr) throw new Error(banErr.message);
   await prisma.profiles.update({ where: { id: userId }, data: { blocked } });
   revalidatePath("/admin/companies");
 }
 
-/**
- * Reset an HR user's password (super-admin only). Existing passwords are hashed
- * and can never be read back — this overwrites it with a new value.
- */
 export async function setUserPassword(userId: string, newPassword: string): Promise<void> {
   const weak = validatePassword(newPassword);
   if (weak) throw new Error(weak);
   await requireSuperAdmin();
 
-  if (DEMO) return; // demo accounts have no real auth backend
+  if (DEMO) return;
 
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.updateUserById(userId, { password: newPassword });
   if (error) throw new Error(error.message);
 }
 
-/** Permanently delete a user account (profile cascades from auth.users). */
 export async function deleteUser(userId: string): Promise<void> {
   const session = await requireSuperAdmin();
   if (userId === session.userId) throw new Error("You can't delete your own account.");

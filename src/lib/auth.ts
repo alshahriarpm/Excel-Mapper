@@ -6,12 +6,6 @@ import { DEMO, DEMO_ROLE_COOKIE, DEMO_EMAIL_COOKIE, demoSessionForRole } from "@
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
-/**
- * Load the signed-in user and their profile (role + company).
- *
- * Identity comes from Supabase Auth (GoTrue); the profile row is read through
- * Prisma (direct DB), NOT PostgREST.
- */
 export async function getSessionProfile(): Promise<{
   userId: string;
   email: string | null;
@@ -43,11 +37,8 @@ export async function getSessionProfile(): Promise<{
       }
     : null;
 
-  // A blocked account is treated as signed-out (belt-and-suspenders alongside
-  // the Supabase Auth ban, which already blocks re-authentication).
   if (profile?.blocked) return null;
 
-  // A blocked company locks out its members — but never the global super-admin.
   if (profile && profile.role !== "super_admin" && profile.company_id) {
     const company = await prisma.companies.findUnique({
       where: { id: profile.company_id },

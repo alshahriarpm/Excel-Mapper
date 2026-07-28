@@ -1,9 +1,3 @@
-/**
- * Test fixtures. These mirror the spec's *example* attendance setup, but note
- * that every column name, condition value and format is passed as data — the
- * engine has none of it hardcoded. Tests also build alternative configs (with
- * different column names) to prove that.
- */
 import type {
   ConversionRule,
   SavedConversionTemplate,

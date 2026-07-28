@@ -4,10 +4,6 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/atoms/ui/button";
 
-/**
- * "Go back" button. Uses browser history when available, otherwise falls back
- * to a sensible parent route (so it still works on a direct page load).
- */
 export function BackButton({
   label = "Back",
   fallbackHref = "/",

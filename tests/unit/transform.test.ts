@@ -139,7 +139,7 @@ describe("Configurable rules", () => {
       rules: [a, b],
     });
     const r = res.rows[0]!;
-    expect(r.appliedRuleName).toBe("A"); // first in order still applies
+    expect(r.appliedRuleName).toBe("A");
     expect(r.status === "multiple_rules_matched" || r.warnings.includes("multiple_rules_matched")).toBe(true);
   });
 
@@ -170,7 +170,7 @@ describe("Missing values", () => {
     ]);
     const r = res.rows[0]!;
     expect(val(r, "in")).toBeNull();
-    expect(val(r, "out")).toBeNull(); // forced blank even though P M OffDuty had a value
+    expect(val(r, "out")).toBeNull();
     expect(r.status).toBe("missing_in_time");
   });
 
@@ -292,8 +292,8 @@ describe("Related-date processing (spec §21)", () => {
       row({ UserID: "E1", Date: "15/07/2026", "On Desc": "Not Swipe", "A M OnDuty": "6:00 AM", "P M OffDuty": "9:30 PM" }),
       row({ UserID: "E1", Date: "16/07/2026", "On Desc": "Absent", "A M OnDuty": "6:30 AM", "P M OffDuty": "18:00" }),
     ]);
-    expect(val(res.rows[0]!, "out")).toBe("6:00 AM"); // 14th overnight → 15th AM
-    expect(val(res.rows[1]!, "out")).toBe("6:30 AM"); // 15th overnight → 16th AM
+    expect(val(res.rows[0]!, "out")).toBe("6:00 AM");
+    expect(val(res.rows[1]!, "out")).toBe("6:30 AM");
   });
 
   it("case 62: unsorted source rows still resolve the exact next day", () => {

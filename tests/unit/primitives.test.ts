@@ -25,7 +25,6 @@ describe("Date parsing", () => {
   });
   it("parses JS Date and Excel serial", () => {
     expect(parseCalendarDate(new Date(2026, 6, 14))?.iso).toBe("2026-07-14");
-    // Excel serial for 2026-07-14
     const serial = Math.round((Date.UTC(2026, 6, 14) - Date.UTC(1899, 11, 30)) / 86400000);
     expect(parseCalendarDate(serial)?.iso).toBe("2026-07-14");
   });
@@ -54,8 +53,8 @@ describe("Output formatting", () => {
   it("formats 12-hour and 24-hour times", () => {
     expect(formatTime("21:00", "h:mm AM/PM")).toBe("9:00 PM");
     expect(formatTime("9:00 AM", "HH:mm")).toBe("09:00");
-    expect(formatTime("9:00 PM", "hh:mm")).toBe("21:00"); // no AM/PM token → 24-hour
-    expect(formatTime("9:00 PM", "hh:mm AM/PM")).toBe("09:00 PM"); // 12-hour with token
+    expect(formatTime("9:00 PM", "hh:mm")).toBe("21:00");
+    expect(formatTime("9:00 PM", "hh:mm AM/PM")).toBe("09:00 PM");
   });
 });
 

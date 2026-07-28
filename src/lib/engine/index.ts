@@ -1,4 +1,3 @@
-/** Public engine surface. Framework-agnostic, no hardcoded attendance logic. */
 export * from "./types";
 export * from "./normalize";
 export * from "./format";

@@ -11,12 +11,6 @@ export type WizardStep = {
   optional?: boolean;
 };
 
-/**
- * Guided multi-step form: a contained card with a left vertical stepper
- * (numbered circles, connecting lines, check/active/upcoming states, optional
- * badges), a spacious content area with heading + subtitle, and a Back/Continue
- * footer. Completed steps in the rail are clickable. One clear job per screen.
- */
 export function WizardShell({
   steps,
   current,
@@ -40,7 +34,6 @@ export function WizardShell({
   return (
     <div className="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8">
       <div className="flex max-h-[calc(100dvh-8rem)] min-h-[540px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-soft lg:flex-row">
-        {/* Left stepper (desktop) */}
         <aside className="hidden shrink-0 flex-col overflow-y-auto border-r border-border bg-secondary/30 p-6 lg:flex lg:w-[300px]">
           <div className="mb-8">
             <p className="text-sm font-semibold">New conversion template</p>
@@ -113,9 +106,7 @@ export function WizardShell({
           </div>
         </aside>
 
-        {/* Content */}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {/* Mobile progress */}
           <div className="border-b border-border p-4 lg:hidden">
             <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
               <span className="font-medium text-foreground">{title}</span>

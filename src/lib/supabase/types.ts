@@ -1,10 +1,3 @@
-/**
- * Hand-authored database types matching supabase/migrations/0001_init.sql.
- * (Regenerate with `supabase gen types typescript` once the CLI is set up.)
- *
- * Table shapes are declared as standalone aliases and composed into `Database`
- * — avoid self-references inside the interface, which break schema inference.
- */
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
 export type UserRole = "super_admin" | "hr";

@@ -26,8 +26,6 @@ function payloadColumns(p: TemplatePayload) {
   };
 }
 
-// Prisma returns Date/JsonValue; map back to the string-timestamp row shape that
-// rowToTemplate (and the rest of the app) expects.
 type PrismaTemplate = Awaited<ReturnType<typeof prisma.templates.findUniqueOrThrow>>;
 function toTemplateRow(t: PrismaTemplate): TemplateRow {
   return {

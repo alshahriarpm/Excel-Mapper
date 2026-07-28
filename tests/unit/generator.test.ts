@@ -220,7 +220,6 @@ describe("Snapshot round-trip (preserving original formatting)", () => {
 
     expect(out.getColumn(1).width).toBe(22);
     expect(out.getRow(1).getCell(1).value).toBe("Employee ID*");
-    // The template's example row is kept verbatim; data is written below it.
     expect(String(out.getRow(2).getCell(1).value)).toBe("SAMPLE");
     expect(String(out.getRow(3).getCell(1).value)).toBe("00125");
   });
@@ -234,10 +233,8 @@ describe("Snapshot round-trip (preserving original formatting)", () => {
     const originalBytes = new Uint8Array(
       (await original.xlsx.writeBuffer()) as ArrayBuffer,
     );
-    // sheetProtection is runtime-only (absent from ExcelJS's type defs).
     const sheetProtected = (w: ExcelJS.Worksheet) =>
       Boolean((w as unknown as { sheetProtection?: { sheet?: boolean } }).sheetProtection?.sheet);
-    // Sanity: the source snapshot really is protected.
     const check = await readBack(originalBytes);
     expect(sheetProtected(check.getWorksheet("Attendance")!)).toBe(true);
 
@@ -257,10 +254,10 @@ describe("Snapshot round-trip (preserving original formatting)", () => {
     const original = new ExcelJS.Workbook();
     const ws = original.addWorksheet("Attendance");
     ws.getRow(1).values = ["Employee ID*", "Date*", "In Time*", "Out Time*"];
-    ws.getRow(2).values = ["Unique employee id", "Attendance date", "HH:MM", "HH:MM"]; // instruction
-    ws.getRow(3).values = ["EMP001", "2023-01-01", "09:00 AM", "05:00 PM"]; // example 1
-    ws.getRow(4).values = ["EMP002", "2023-01-02", "09:15", "17:15"]; // example 2
-    ws.getRow(5).values = ["EMP003", "2023-01-03", "09:30 AM", "05:30 PM"]; // example 3
+    ws.getRow(2).values = ["Unique employee id", "Attendance date", "HH:MM", "HH:MM"];
+    ws.getRow(3).values = ["EMP001", "2023-01-01", "09:00 AM", "05:00 PM"];
+    ws.getRow(4).values = ["EMP002", "2023-01-02", "09:15", "17:15"];
+    ws.getRow(5).values = ["EMP003", "2023-01-03", "09:30 AM", "05:30 PM"];
     const originalBytes = new Uint8Array(
       (await original.xlsx.writeBuffer()) as ArrayBuffer,
     );
@@ -275,13 +272,11 @@ describe("Snapshot round-trip (preserving original formatting)", () => {
     });
     const out = (await readBack(file.data)).getWorksheet("Attendance")!;
 
-    // Header + instruction + all 3 examples preserved verbatim (rows 1-5).
     expect(out.getRow(1).getCell(1).value).toBe("Employee ID*");
     expect(String(out.getRow(2).getCell(1).value)).toBe("Unique employee id");
     expect(String(out.getRow(3).getCell(1).value)).toBe("EMP001");
     expect(String(out.getRow(4).getCell(1).value)).toBe("EMP002");
     expect(String(out.getRow(5).getCell(1).value)).toBe("EMP003");
-    // Converted data begins on row 6, right after the 4 preamble rows.
     expect(String(out.getRow(6).getCell(1).value)).toBe("00125");
   });
 });

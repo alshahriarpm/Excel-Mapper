@@ -4,10 +4,6 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 
-/**
- * Progress-as-loading: cycles through friendly step messages instead of a bare
- * spinner, so the user always knows what's happening.
- */
 export function LoadingProgress({
   messages,
   intervalMs = 900,

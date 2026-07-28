@@ -24,9 +24,8 @@ import type {
 
 type Filter = "all" | RowStatus;
 
-// Prefix-group sentinels for IDs that have no leading letters.
-const NUMERIC_PREFIX = "#"; // id starts with a digit / symbol
-const NO_ID_PREFIX = "(no ID)"; // employee-id cell is blank
+const NUMERIC_PREFIX = "#";
+const NO_ID_PREFIX = "(no ID)";
 
 export function ConversionReview({
   template,
@@ -62,9 +61,6 @@ export function ConversionReview({
     [template],
   );
 
-  // --- Employee-ID prefix filter --------------------------------------------
-  // The output column that carries the Employee ID (direct copy of the source
-  // employee column). Its value's leading letters are the "prefix".
   const empKey = useMemo(() => {
     const col = columns.find(
       (c) => c.mapping.kind === "direct" && c.mapping.sourceColumn === template.sourceConfiguration.employeeColumn,
@@ -83,9 +79,6 @@ export function ConversionReview({
     [empKey],
   );
 
-  // Count each prefix over the rows that can actually be written (drops
-  // fully-blank and excluded rows), so a chip's count matches what lands in
-  // the file and every writable row — including blank-ID rows — gets a group.
   const writableRows = useMemo(
     () => rowsForOutput(result.rows, "include_incomplete", columns),
     [result.rows, columns],
@@ -101,7 +94,6 @@ export function ConversionReview({
 
   const showPrefixFilter = prefixCounts.length >= 2;
   const [selectedPrefixes, setSelectedPrefixes] = useState<Set<string>>(new Set());
-  // Default: all prefixes selected; reset whenever the set of prefixes changes.
   useEffect(() => {
     setSelectedPrefixes(new Set(prefixCounts.map(([p]) => p)));
   }, [prefixCounts]);
@@ -114,8 +106,6 @@ export function ConversionReview({
     });
   }
 
-  // Rows eligible for download: only the selected ID prefixes. When the filter
-  // is off, everything is eligible (identical to the default all-selected set).
   const downloadRows = useMemo(
     () => (showPrefixFilter ? result.rows.filter((r) => selectedPrefixes.has(prefixOf(r))) : result.rows),
     [result.rows, showPrefixFilter, selectedPrefixes, prefixOf],
@@ -126,14 +116,11 @@ export function ConversionReview({
     [downloadRows, columns],
   );
 
-  // The review table follows the Employee-ID group selection too (downloadRows
-  // already applies it), so what you see matches what you download.
   const visibleRows = useMemo(() => {
     if (filter === "all") return downloadRows;
     return downloadRows.filter((r) => r.status === filter || r.warnings.includes(filter));
   }, [downloadRows, filter]);
 
-  // Pagination — back to page 1 whenever the filter, page size, or data changes.
   useEffect(() => setPage(1), [filter, pageSize, visibleRows.length]);
   const totalPages = Math.max(1, Math.ceil(visibleRows.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -144,8 +131,6 @@ export function ConversionReview({
   const rangeStart = visibleRows.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
   const rangeEnd = Math.min(safePage * pageSize, visibleRows.length);
 
-  // Status counts reflect the selected ID groups, keeping the cards, table and
-  // download panel consistent as groups are ticked/unticked.
   const s = useMemo(() => summarize(downloadRows), [downloadRows]);
 
   async function download(mode: OutputExportMode) {
@@ -158,8 +143,6 @@ export function ConversionReview({
         fileNameOverride,
       });
       triggerDownload(file);
-      // Log the counts for what was actually exported (respecting the prefix
-      // filter and export mode), not the full unfiltered conversion.
       onDownloaded?.(mode, summarize(rowsForOutput(downloadRows, mode, columns)));
     } finally {
       setBusy(false);
@@ -171,7 +154,6 @@ export function ConversionReview({
 
   return (
     <div className="space-y-6">
-      {/* Summary cards (clickable filters) */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <SummaryCard label="Ready" value={s.ready} tone="success" icon={<CheckCircle2 className="h-5 w-5" />} active={filter === "ready"} onClick={() => setFilter(filter === "ready" ? "all" : "ready")} />
         <SummaryCard label="Missing Check-In" value={s.missingInTime} tone="destructive" icon={<FileWarning className="h-5 w-5" />} active={filter === "missing_in_time"} onClick={() => setFilter(filter === "missing_in_time" ? "all" : "missing_in_time")} />
@@ -181,7 +163,6 @@ export function ConversionReview({
         <SummaryCard label="Duplicates" value={s.duplicate} tone="destructive" icon={<Layers className="h-5 w-5" />} active={filter === "duplicate"} onClick={() => setFilter(filter === "duplicate" ? "all" : "duplicate")} />
       </div>
 
-      {/* Results table */}
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <CardTitle className="text-base">
@@ -265,7 +246,6 @@ export function ConversionReview({
         </CardContent>
       </Card>
 
-      {/* Employee-ID prefix filter */}
       {showPrefixFilter && (
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-3">
@@ -317,7 +297,6 @@ export function ConversionReview({
         </Card>
       )}
 
-      {/* Download panel */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Download</CardTitle>

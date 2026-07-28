@@ -95,8 +95,6 @@ export function draftFromTemplate(t: SavedConversionTemplate): Draft {
   };
 }
 
-// localStorage that never throws — a quota error (e.g. a very large source
-// sample) degrades to "not persisted" instead of crashing the builder.
 const safeStorage: StateStorage = {
   getItem: (name) => {
     try {
@@ -109,24 +107,20 @@ const safeStorage: StateStorage = {
     try {
       localStorage.setItem(name, value);
     } catch {
-      /* quota / privacy mode — skip */
     }
   },
   removeItem: (name) => {
     try {
       localStorage.removeItem(name);
     } catch {
-      /* ignore */
     }
   },
 };
 
 type BuilderStore = {
-  /** Which template this draft belongs to — `"new"` or an existing template id. */
   contextId: string;
   draft: Draft;
   current: number;
-  /** True once we've read persisted state this page-load (in-memory only). */
   hasHydrated: boolean;
   patch: (p: Partial<Draft>) => void;
   setCurrent: (n: number) => void;
@@ -150,12 +144,7 @@ export const useBuilderStore = create<BuilderStore>()(
       name: "bulk-mapper:template-builder",
       version: 1,
       storage: createJSONStorage(() => safeStorage),
-      // We rehydrate manually (once per page-load) to keep SSR markup stable and
-      // to avoid clobbering in-session state on client-side navigations.
       skipHydration: true,
-      // Persist the configuration + step, but NOT the parsed source sample:
-      // it can be large, and its Date values don't round-trip through JSON. The
-      // user re-drops the source file to re-run the test after a reload.
       partialize: (s) => ({
         contextId: s.contextId,
         current: s.current,

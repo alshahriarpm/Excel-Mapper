@@ -15,7 +15,6 @@ const KIND_LABELS: Record<SourceKind, string> = {
   formula: "an advanced formula",
 };
 
-/** Sentence-style editor for where a value (In/Out time) comes from. */
 export function ValueSourceEditor({
   value,
   sourceColumns,

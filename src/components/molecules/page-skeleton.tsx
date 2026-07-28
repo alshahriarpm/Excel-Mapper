@@ -1,7 +1,6 @@
 import { Skeleton } from "@/components/atoms/ui/skeleton";
 import { Card, CardContent } from "@/components/atoms/ui/card";
 
-/** Static placeholder that matches the real TopBar's height and layout. */
 export function TopBarSkeleton() {
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
@@ -21,7 +20,6 @@ export function TopBarSkeleton() {
   );
 }
 
-/** A block of header text placeholders (eyebrow + title + subtitle). */
 export function PageHeaderSkeleton({ eyebrow = false }: { eyebrow?: boolean }) {
   return (
     <div className="mb-8 space-y-2">
@@ -32,7 +30,6 @@ export function PageHeaderSkeleton({ eyebrow = false }: { eyebrow?: boolean }) {
   );
 }
 
-/** A responsive grid of card placeholders. */
 export function CardGridSkeleton({ count = 3, cols = "sm:grid-cols-3" }: { count?: number; cols?: string }) {
   return (
     <div className={`grid gap-4 ${cols}`}>

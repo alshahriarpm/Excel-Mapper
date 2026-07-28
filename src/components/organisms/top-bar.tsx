@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-/** Shared top bar with brand, role label, and sign-out. */
 export function TopBar({
   role,
   email,

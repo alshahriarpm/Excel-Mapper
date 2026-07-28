@@ -7,10 +7,6 @@ import type { Json } from "@/lib/supabase/types";
 import type { ConversionResult } from "@/lib/engine/types";
 import { DEMO, demoStore } from "@/lib/demo";
 
-/**
- * Record a light audit-log entry for a conversion. Per the privacy decision,
- * NO raw source rows are stored — only who/when/what and the result counts.
- */
 export async function logConversion(input: {
   templateId: string;
   companyId: string;

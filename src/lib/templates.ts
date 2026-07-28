@@ -31,7 +31,6 @@ export function rowToTemplate(row: TemplateRow): SavedConversionTemplate {
   };
 }
 
-/** The editable configuration payload (everything except server-managed fields). */
 export type TemplatePayload = {
   companyId: string;
   name: string;

@@ -11,18 +11,10 @@ function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`) || pathname.startsWith(p));
 }
 
-/**
- * Refresh the auth session on every request and gate protected routes.
- * Unauthenticated users are redirected to /login; signed-in users hitting
- * /login are sent to the home dispatcher.
- */
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
   let response = NextResponse.next({ request });
   const { pathname } = request.nextUrl;
 
-  // Demo mode: no Supabase, but still gate on a lightweight role cookie so the
-  // flow mirrors real login (unauthenticated → /login; role decides the rest).
-  // Never honored in production (auth bypass must never ship live).
   if (process.env.NEXT_PUBLIC_DEMO_MODE === "true" && process.env.NODE_ENV !== "production") {
     const hasRole = Boolean(request.cookies.get("demo_role")?.value);
     if (!hasRole && !isPublic(pathname)) {
@@ -38,7 +30,6 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     return response;
   }
 
-  // Env not configured yet — don't hard-fail the whole app.
   if (!hasSupabasePublicConfig) {
     return response;
   }

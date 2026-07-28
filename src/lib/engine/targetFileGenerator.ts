@@ -1,15 +1,3 @@
-/**
- * Target-format output generator (spec §31).
- *
- * The downloaded file is generated FROM the saved target workbook, not as a
- * generic new table. We reload the original workbook bytes and:
- *   - keep worksheet names & order, static rows above the header, the header
- *     row, column names & order, blank columns, widths, frozen panes;
- *   - write converted records only into the data area below the header;
- *   - format each value using the target's own date/time/number/text formats.
- *
- * Runs in the browser (ExcelJS) so source data never leaves the machine.
- */
 import ExcelJS from "exceljs";
 import type {
   CellValue,
@@ -32,7 +20,6 @@ export type GenerateTargetFileInput = {
   targetConfiguration: TargetWorkbookConfiguration;
   convertedRows: ConvertedRow[];
   outputMode: OutputExportMode;
-  /** Explicit filename (without needing the pattern). */
   fileNameOverride?: string;
 };
 
@@ -43,16 +30,11 @@ export type GeneratedFile = {
   mimeType: string;
 };
 
-// ---------------------------------------------------------------------------
-// Row filtering by export mode. The blank-In-forces-blank-Out invariant is
-// already enforced in the converted cells, so no filtered row can leak an
-// In=blank / Out=present record.
-// ---------------------------------------------------------------------------
 
 function filterRows(rows: ConvertedRow[], mode: OutputExportMode): ConvertedRow[] {
   const notExcluded = rows.filter((r) => !r.excluded);
   if (mode === "valid_only") return notExcluded.filter((r) => r.status === "ready");
-  return notExcluded; // "all" and "include_incomplete"
+  return notExcluded;
 }
 
 function inOutColumnKeys(columns: TargetColumnConfiguration[]): { inKey?: string; outKey?: string } {
@@ -61,11 +43,6 @@ function inOutColumnKeys(columns: TargetColumnConfiguration[]): { inKey?: string
   return { inKey, outKey };
 }
 
-/**
- * The rows actually written to the file: the export-mode filter, then a hard
- * rule — a row with NO Check-In AND NO Check-Out is an empty attendance record
- * and is never written to the output (regardless of export mode).
- */
 export function rowsForOutput(
   rows: ConvertedRow[],
   mode: OutputExportMode,
@@ -80,13 +57,6 @@ export function rowsForOutput(
   });
 }
 
-/**
- * Number of contiguous non-empty rows immediately below the header — the
- * template's instruction row and example rows (e.g. EMP001…). These are kept
- * verbatim in the output; converted data is written below them. Scanning stops
- * at the first blank row, so it never walks the thousands of empty
- * data-validated rows a bulk-upload template carries.
- */
 function preambleRowCount(
   worksheet: ExcelJS.Worksheet,
   headerRowNumber: number,
@@ -105,10 +75,6 @@ function preambleRowCount(
   return count;
 }
 
-// ---------------------------------------------------------------------------
-// Value → typed Excel cell. Dates/times are written as numeric serials with a
-// number format, which is timezone-safe and round-trips cleanly.
-// ---------------------------------------------------------------------------
 
 function dateToSerial(year: number, month: number, day: number): number {
   return Math.round((Date.UTC(year, month - 1, day) - EXCEL_EPOCH_UTC) / 86_400_000);
@@ -167,7 +133,6 @@ function writeTypedCell(
     }
     case "text":
     default: {
-      // Preserve leading zeros etc. by forcing text.
       cell.value = typeof value === "number" ? value : String(value);
       if (col.format?.preserveLeadingZeros) {
         cell.value = String(value);
@@ -178,9 +143,6 @@ function writeTypedCell(
   }
 }
 
-// ---------------------------------------------------------------------------
-// base64 <-> bytes (works in browser and Node)
-// ---------------------------------------------------------------------------
 
 function base64ToBytes(b64: string): Uint8Array {
   if (typeof atob === "function") {
@@ -192,9 +154,6 @@ function base64ToBytes(b64: string): Uint8Array {
   return new Uint8Array(Buffer.from(b64, "base64"));
 }
 
-// ---------------------------------------------------------------------------
-// XLSX generation
-// ---------------------------------------------------------------------------
 
 async function generateXlsx(input: GenerateTargetFileInput): Promise<Uint8Array> {
   const { targetConfiguration: tc, convertedRows, outputMode } = input;
@@ -202,29 +161,21 @@ async function generateXlsx(input: GenerateTargetFileInput): Promise<Uint8Array>
   const orderedColumns = tc.columns.slice().sort((a, b) => a.order - b.order);
 
   let worksheet: ExcelJS.Worksheet;
-  // Rows kept verbatim below the header (the template's instruction + example
-  // rows). Only the snapshot path has any; the reconstructed shell has none.
   let preamble = 0;
 
   if (tc.workbookSnapshot) {
-    // Reload the original workbook to preserve every safe detail.
     await workbook.xlsx.load(base64ToBytes(tc.workbookSnapshot) as unknown as ExcelJS.Buffer);
-    // Bulk-upload templates often lock the data sheet; the filled output should
-    // be freely editable, so drop worksheet protection everywhere.
     workbook.worksheets.forEach((ws) => ws.unprotect());
     worksheet =
       workbook.getWorksheet(tc.outputWorksheetName) ??
       workbook.worksheets[tc.outputWorksheetIndex] ??
       workbook.worksheets[0]!;
-    // Keep the header + the template's instruction/example rows, and drop only
-    // what's below them (any extra placeholders + the empty validated rows).
     preamble = preambleRowCount(worksheet, tc.headerRowNumber, orderedColumns);
     const firstDataRow = tc.headerRowNumber + 1 + preamble;
     if (worksheet.rowCount >= firstDataRow) {
       worksheet.spliceRows(firstDataRow, worksheet.rowCount - firstDataRow + 1);
     }
   } else {
-    // No snapshot (e.g. built programmatically): reconstruct the shell.
     worksheet = workbook.addWorksheet(tc.outputWorksheetName || "Sheet1");
     tc.staticRowsAboveHeader.forEach((r, i) => {
       worksheet.getRow(i + 1).values = r as ExcelJS.CellValue[];
@@ -247,7 +198,6 @@ async function generateXlsx(input: GenerateTargetFileInput): Promise<Uint8Array>
     }
   }
 
-  // Write converted rows into the data area, below the preserved preamble.
   const dataStartRow = tc.headerRowNumber + 1 + preamble;
   const rowsToWrite = rowsForOutput(convertedRows, outputMode, orderedColumns);
   rowsToWrite.forEach((row, i) => {
@@ -260,11 +210,6 @@ async function generateXlsx(input: GenerateTargetFileInput): Promise<Uint8Array>
     excelRow.commit?.();
   });
 
-  // A bulk-upload template is often pre-formatted with thousands of empty,
-  // data-validated rows (dropdowns out to e.g. row 5000). Those persist in
-  // ExcelJS's internal row store and leave trailing empty rows in the output.
-  // The filled output doesn't need entry dropdowns, so drop ALL data
-  // validations and truncate the row store to exactly the real data.
   const lastDataRow = dataStartRow - 1 + rowsToWrite.length;
   const wsInternal = worksheet as unknown as {
     dataValidations?: { model?: Record<string, unknown> };
@@ -279,9 +224,6 @@ async function generateXlsx(input: GenerateTargetFileInput): Promise<Uint8Array>
   return new Uint8Array(buffer as ArrayBuffer);
 }
 
-// ---------------------------------------------------------------------------
-// CSV generation (formatting is applied as text; styling cannot be preserved)
-// ---------------------------------------------------------------------------
 
 function csvEscape(value: string): string {
   if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
@@ -306,13 +248,10 @@ function generateCsv(input: GenerateTargetFileInput): Uint8Array {
     );
   });
 
-  const text = "﻿" + lines.join("\r\n"); // BOM for Excel compatibility
+  const text = "﻿" + lines.join("\r\n");
   return new TextEncoder().encode(text);
 }
 
-// ---------------------------------------------------------------------------
-// Filename
-// ---------------------------------------------------------------------------
 
 function baseName(fileName: string): { name: string; ext: string } {
   const dot = fileName.lastIndexOf(".");
@@ -326,13 +265,9 @@ function resolveFileName(input: GenerateTargetFileInput, actualType: "xlsx" | "c
   return `${name}.${actualType}`;
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 export async function generateTargetFile(input: GenerateTargetFileInput): Promise<GeneratedFile> {
   const declared = input.targetConfiguration.originalFileType;
-  // .xls cannot be written safely; we output .xlsx (the UI confirms this first).
   const actualType: "xlsx" | "csv" = declared === "csv" ? "csv" : "xlsx";
 
   if (actualType === "csv") {

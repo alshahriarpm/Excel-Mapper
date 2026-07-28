@@ -16,7 +16,6 @@ export default async function HrConvertPage({
   if (session.profile?.role !== "hr") redirect("/");
 
   const template = await getTemplateById(templateId);
-  // RLS already scopes to the user's company; guard against missing/other-company.
   if (
     !template ||
     template.companyId !== session.profile?.company_id ||

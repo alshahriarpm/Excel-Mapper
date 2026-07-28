@@ -1,19 +1,3 @@
-/**
- * The configurable attendance transform.
- *
- * Everything is configuration-driven. The processor:
- *   1. reads mappings from the template,
- *   2. builds the employee-date index from the configured columns,
- *   3. matches rules in saved order,
- *   4. computes In Time FIRST, applies missing-In behavior,
- *   5. computes Out Time only when allowed (blank In → blank Out, always),
- *   6. applies missing-Out behavior,
- *   7. tracks source-cell provenance,
- *   8. validates the configured unique target fields,
- *   9. returns converted rows + plain-language issues.
- *
- * No source or target column name, condition value, or format is hardcoded.
- */
 import type {
   CellProvenance,
   CellValue,
@@ -39,7 +23,6 @@ import {
 import { buildEmployeeDateIndex, type LookupOutcome } from "./employeeDateIndex";
 import { compileFormula, type FormulaContext } from "./formulaEngine";
 
-// Severity order — first match wins as the row's primary status.
 const STATUS_PRIORITY: RowStatus[] = [
   "excluded",
   "no_matching_rule",
@@ -62,7 +45,6 @@ function pickPrimary(flags: Set<RowStatus>): {
   return { primary, warnings: ordered.slice(1).filter((s) => s !== "ready") };
 }
 
-/** Build a resolver that maps a requested column name to the actual row key. */
 function makeColumnResolver(sourceRows: SourceRow[]): (name: string) => string | undefined {
   const map = new Map<string, string>();
   for (const row of sourceRows) {
@@ -74,9 +56,6 @@ function makeColumnResolver(sourceRows: SourceRow[]): (name: string) => string |
   return (name: string) => map.get(normalizeHeader(name));
 }
 
-// ---------------------------------------------------------------------------
-// Condition matching
-// ---------------------------------------------------------------------------
 
 function conditionMatches(
   cond: ConversionCondition,
@@ -92,7 +71,6 @@ function conditionMatches(
 
   const nv = canonicalAlias(value, normalization);
   const targets = cond.values.map((v) => canonicalAlias(v, normalization));
-  // A values entry of "" or "blank" is treated as "the cell is empty".
   const blankIntended = cond.values.some((v) => {
     const c = normalizeForMatch(v, normalization);
     return c === "" || c === "blank";
@@ -124,14 +102,11 @@ function ruleMatches(
   resolveColumn: (name: string) => string | undefined,
   normalization: ConfigurableAttendanceTransformInput["sourceConfiguration"]["normalization"],
 ): boolean {
-  if (rule.conditions.length === 0) return true; // no conditions = catch-all
+  if (rule.conditions.length === 0) return true;
   const results = rule.conditions.map((c) => conditionMatches(c, row, resolveColumn, normalization));
   return rule.conditionJoin === "or" ? results.some(Boolean) : results.every(Boolean);
 }
 
-// ---------------------------------------------------------------------------
-// Value-source resolution
-// ---------------------------------------------------------------------------
 
 type ResolvedValue = {
   value: CellValue;
@@ -242,9 +217,6 @@ function resolveValueSource(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Column mapping resolution (non-time columns)
-// ---------------------------------------------------------------------------
 
 function resolveColumnMapping(
   mapping: ColumnMapping,
@@ -283,16 +255,12 @@ function resolveColumnMapping(
     case "in_time":
     case "out_time":
     case "unmapped":
-      // Handled by the rule engine / not yet configured.
       return null;
     default:
       return null;
   }
 }
 
-// ---------------------------------------------------------------------------
-// Main transform
-// ---------------------------------------------------------------------------
 
 export function runConfigurableAttendanceTransform(
   input: ConfigurableAttendanceTransformInput,
@@ -324,7 +292,6 @@ export function runConfigurableAttendanceTransform(
   sourceRows.forEach((row, sourceRowIndex) => {
     const flags = new Set<RowStatus>();
 
-    // --- Rule selection (in saved order) ---------------------------------
     let appliedRule: ConversionRule | null = null;
     let additionalMatches = 0;
     for (const rule of activeRules) {
@@ -343,7 +310,6 @@ export function runConfigurableAttendanceTransform(
     if (!appliedRule) flags.add("no_matching_rule");
     if (additionalMatches > 0) flags.add("multiple_rules_matched");
 
-    // --- In Time first, then Out Time ------------------------------------
     let inValue: CellValue = null;
     let outValue: CellValue = null;
     let inProvenance: CellProvenance = { description: "Not calculated" };
@@ -361,7 +327,7 @@ export function runConfigurableAttendanceTransform(
           flags.add("missing_in_time");
         }
         inValue = null;
-        outValue = null; // blank In ALWAYS forces blank Out
+        outValue = null;
         outProvenance = { description: "Forced blank (no In Time)" };
       } else {
         inValue = inRes.value;
@@ -385,7 +351,6 @@ export function runConfigurableAttendanceTransform(
       }
     }
 
-    // --- Build every target cell -----------------------------------------
     const cells: Record<string, ConvertedCell> = {};
     for (const col of targetColumns) {
       let cellValue: CellValue = null;
@@ -409,7 +374,6 @@ export function runConfigurableAttendanceTransform(
       cells[col.key] = { columnKey: col.key, value: cellValue, provenance };
     }
 
-    // --- Enforce the invariant once more at the cell level ---------------
     if (inTimeColumn && outTimeColumn) {
       const inCell = cells[inTimeColumn.key];
       const outCell = cells[outTimeColumn.key];
@@ -419,11 +383,10 @@ export function runConfigurableAttendanceTransform(
       }
     }
 
-    // --- Required-value check (non time-specific) ------------------------
     if (appliedRule && !excluded) {
       for (const col of targetColumns) {
         if (!col.required) continue;
-        if (col === inTimeColumn || col === outTimeColumn) continue; // own statuses
+        if (col === inTimeColumn || col === outTimeColumn) continue;
         if (isBlank(cells[col.key]?.value ?? null)) {
           flags.add("missing_required_value");
           break;
@@ -444,14 +407,13 @@ export function runConfigurableAttendanceTransform(
     });
   });
 
-  // --- Duplicate validation on configured unique target fields ------------
   if (uniqueTargetFields.length > 0) {
     const seen = new Map<string, number>();
     rows.forEach((r) => {
       if (r.excluded) return;
       const composite = uniqueTargetFields
         .map((k) => normalizeForMatch(r.cells[k]?.value ?? null, normalization))
-        .join(" ␟ "); // unit separator to avoid accidental collisions
+        .join(" ␟ ");
       const count = seen.get(composite) ?? 0;
       if (count >= 1) {
         if (r.status === "ready") {
@@ -472,11 +434,6 @@ export function runConfigurableAttendanceTransform(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Output text formatting (leading zeros, blank placeholders).
-// Date/time/number *display* formatting is applied by the target generator
-// using the target file's own formats.
-// ---------------------------------------------------------------------------
 
 function applyTextFormat(value: CellValue, col: TargetColumnConfiguration): CellValue {
   if (isBlank(value)) {
@@ -488,9 +445,6 @@ function applyTextFormat(value: CellValue, col: TargetColumnConfiguration): Cell
   return value;
 }
 
-// ---------------------------------------------------------------------------
-// Issues & summary
-// ---------------------------------------------------------------------------
 
 const ISSUE_COPY: Record<RowStatus, { message: string; suggestion?: string }> = {
   ready: { message: "Ready" },

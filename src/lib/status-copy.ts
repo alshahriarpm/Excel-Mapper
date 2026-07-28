@@ -2,7 +2,6 @@ import type { RowStatus } from "@/lib/engine/types";
 
 export type StatusTone = "success" | "warning" | "destructive" | "secondary";
 
-/** Plain-language, HR-friendly labels for every row status. */
 export const ROW_STATUS_META: Record<RowStatus, { label: string; tone: StatusTone }> = {
   ready: { label: "Ready", tone: "success" },
   missing_in_time: { label: "Missing Check-In", tone: "destructive" },

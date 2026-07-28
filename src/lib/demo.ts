@@ -1,26 +1,7 @@
-/**
- * Zero-backend DEMO mode.
- *
- * When NEXT_PUBLIC_DEMO_MODE=true, the app runs with an in-memory data layer
- * and a bypassed auth session, so the whole product can be explored without a
- * Supabase connection. Every real data path checks `DEMO` first and returns
- * this in-memory data instead of touching the database. Nothing here runs in
- * production (the flag is off by default).
- *
- * NOTE: state lives in module-level arrays — it persists for the life of the
- * dev server process but is not durable. That's intentional for a demo.
- */
 import { DEFAULT_NORMALIZATION } from "@/lib/engine/types";
 import type { ConversionRule, SavedConversionTemplate, SourceRow, TargetColumnConfiguration } from "@/lib/engine/types";
 import type { UserRole } from "@/lib/supabase/types";
 
-/**
- * Demo mode bypasses authentication entirely, so it must NEVER be active in a
- * production build — otherwise anyone could reach admin screens without signing
- * in. It is honored only in non-production (local dev / test). Deploy with real
- * Supabase auth; to show a hosted demo, use real login (the admin is seeded
- * from env automatically).
- */
 export const DEMO =
   process.env.NEXT_PUBLIC_DEMO_MODE === "true" && process.env.NODE_ENV !== "production";
 
@@ -54,11 +35,9 @@ export const demoHrSession = {
   },
 };
 
-/** Cookies that record the "signed in" demo user. */
 export const DEMO_ROLE_COOKIE = "demo_role";
 export const DEMO_EMAIL_COOKIE = "demo_email";
 
-/** Resolve the demo session from the signed-in demo role + email cookies. */
 export function demoSessionForRole(role: string | undefined, email?: string) {
   const base = role === "hr" ? demoHrSession : role === "super_admin" ? demoSession : null;
   if (!base) return null;
@@ -164,7 +143,6 @@ function seededTemplate(): SavedConversionTemplate {
   };
 }
 
-/** Sample source rows for the HR "try with sample data" button. */
 export function demoSampleRows(): SourceRow[] {
   return [
     { UserID: "00101", Date: "14/07/2026", "On Desc": "Not Swipe", "A M OnDuty": "", "P M OffDuty": "9:00 PM" },
@@ -175,13 +153,7 @@ export function demoSampleRows(): SourceRow[] {
   ];
 }
 
-// ---------------------------------------------------------------------------
-// In-memory stores
-// ---------------------------------------------------------------------------
 
-// Backed by globalThis so every module instance (Next dev can duplicate a
-// module per route/HMR) shares ONE state — keeping the demo coherent across
-// routes. Real mode uses Supabase, so this is demo-only.
 type DemoState = {
   companies: DemoCompany[];
   templates: SavedConversionTemplate[];
@@ -214,7 +186,6 @@ export const demoStore = {
     const c = state.companies.find((x) => x.id === companyId);
     if (c) c.blocked = blocked;
   },
-  /** Returns an error message if the company can't be deleted, else null. */
   companyDeletionBlocker: (companyId: string): string | null => {
     const userCount = state.users.filter((u) => u.company_id === companyId).length;
     const templateCount = state.templates.filter((t) => t.companyId === companyId).length;
@@ -225,7 +196,6 @@ export const demoStore = {
   },
   deleteCompany: (companyId: string, force = false) => {
     if (force) {
-      // Cascade: remove the company's users, templates (and their history).
       for (let i = state.users.length - 1; i >= 0; i--) {
         if (state.users[i]!.company_id === companyId) state.users.splice(i, 1);
       }

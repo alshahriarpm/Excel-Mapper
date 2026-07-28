@@ -1,10 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
 
-/**
- * End-to-end journeys against DEMO mode (in-memory backend). Serial: the demo
- * backend is shared server state, and the later admin tests mutate it, so the
- * destructive ones run last.
- */
 
 const ADMIN_EMAIL = "admin@bulkmapper.app";
 const ADMIN_PASSWORD = "Admin12345!";
@@ -40,7 +35,6 @@ test.describe.serial("Bulk Mapper — demo mode journeys", () => {
     await signIn(page, ADMIN_EMAIL, ADMIN_PASSWORD);
     await page.waitForURL(/\/admin$/);
     await expect(page.getByRole("heading", { name: /What would you like to do\?/ })).toBeVisible();
-    // Role separation: a super-admin cannot land in the HR area.
     await page.goto("/hr");
     await expect(page).toHaveURL(/\/admin$/);
     await signOut(page);
@@ -54,13 +48,10 @@ test.describe.serial("Bulk Mapper — demo mode journeys", () => {
 
     await page.getByRole("button", { name: "Try with sample data" }).click();
 
-    // Engine computed 3 ready rows from the 5-row sample.
     await expect(page.getByRole("button", { name: /Download ready only \(3\)/ })).toBeVisible();
-    // A distinct status badge from the overnight/next-day logic.
     await expect(page.getByText("Next-Day Record Missing")).toBeVisible();
     await expect(page.getByText("Attendance Bulk Upload.xlsx")).toBeVisible();
 
-    // Download uses the saved target filename.
     const [download] = await Promise.all([
       page.waitForEvent("download"),
       page.getByRole("button", { name: /Download ready only/ }).click(),
@@ -88,7 +79,6 @@ test.describe.serial("Bulk Mapper — demo mode journeys", () => {
     await page.goto("/admin/companies");
 
     await page.getByRole("button", { name: "Delete this company" }).click();
-    // Confirm without ticking "force" — should be refused.
     await page.getByRole("button", { name: "Delete company" }).click();
     await expect(page.getByText(/still has .* template/i)).toBeVisible();
     await page.getByRole("button", { name: "Cancel" }).click();

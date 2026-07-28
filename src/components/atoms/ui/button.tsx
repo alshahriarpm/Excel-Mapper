@@ -32,14 +32,12 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
-  /** Show a spinner and disable the button while an action is in flight. */
   loading?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, loading = false, disabled, children, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
-    // Slot expects a single child, so the spinner is only injected for real buttons.
     if (asChild) {
       return (
         <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} disabled={disabled} {...props}>
@@ -51,8 +49,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <Comp
         className={cn(
           buttonVariants({ variant, size, className }),
-          // While the spinner shows, hide any decorative leading icon so we
-          // never render spinner + icon side by side.
           loading && "[&>svg:not(.animate-spin)]:hidden",
         )}
         ref={ref}

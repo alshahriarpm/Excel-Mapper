@@ -39,10 +39,6 @@ const STEPS: WizardStep[] = [
   { id: "save", title: "Save template", description: "Name it and publish" },
 ];
 
-// Best-effort guess of whether a target column receives the computed Check-In or
-// Check-Out time — used ONLY as an editable default in the Map-columns step, so
-// the admin rarely has to change it. Everything else is inferred from the
-// per-column mapping the admin confirms there (no separate "assign roles" step).
 function guessComputedKind(header: string): "in_time" | "out_time" | null {
   const h = header.toLowerCase().replace(/[_\-.]+/g, " ");
   if (!/(time|punch|clock|swipe|check|\bin\b|\bout\b)/.test(h)) return null;
@@ -51,13 +47,12 @@ function guessComputedKind(header: string): "in_time" | "out_time" | null {
   return null;
 }
 
-// Encode/decode a column mapping as a <Select> value.
 function mappingToValue(m: ColumnMapping): string {
   if (m.kind === "direct") return `src:${m.sourceColumn}`;
   if (m.kind === "in_time" || m.kind === "out_time" || m.kind === "blank" || m.kind === "unmapped") {
     return m.kind;
   }
-  return "advanced"; // fixed / combined / formula / next_calendar_day_column — preserved as-is
+  return "advanced";
 }
 function valueToMapping(v: string, prev: ColumnMapping): ColumnMapping {
   if (v.startsWith("src:")) return { kind: "direct", sourceColumn: v.slice(4) };
@@ -91,8 +86,6 @@ export function TemplateBuilder({
   const router = useRouter();
   const contextId = initial?.id ?? "new";
 
-  // Draft + step live in a persisted Zustand store, so a reload restores exactly
-  // where you were with your data intact.
   const draft = useBuilderStore((s) => s.draft);
   const current = useBuilderStore((s) => s.current);
   const hasHydrated = useBuilderStore((s) => s.hasHydrated);
@@ -104,11 +97,8 @@ export function TemplateBuilder({
   const [saveMode, setSaveMode] = useState<SavedConversionTemplate["status"] | null>(null);
   const [error, setError] = useState("");
 
-  // Keep the parsed workbooks so worksheet/header changes can re-derive columns.
   const [parsedTarget, setParsedTarget] = useState<Awaited<ReturnType<typeof parseWorkbook>> | null>(null);
 
-  // Restore persisted progress once per page-load, then make sure the restored
-  // draft belongs to THIS template (new vs. a specific id) — else start fresh.
   useEffect(() => {
     if (!useBuilderStore.getState().hasHydrated) {
       useBuilderStore.persist.rehydrate();
@@ -174,11 +164,6 @@ export function TemplateBuilder({
   }
 
   const payload = useMemo((): TemplatePayload => {
-    // Mappings are taken straight from what the admin set in the Map-columns
-    // step — no role→mapping translation. One refinement: the column that copies
-    // the source date column is a real DATE, so mark it as such — the output is
-    // then formatted with the target date format (e.g. "2026-07-14") instead of
-    // copied verbatim with any trailing text like a weekday ("2026-07-14 Tuesday").
     const columns = draft.targetColumns.map((col) =>
       col.mapping.kind === "direct" &&
       col.mapping.sourceColumn === draft.dateColumn &&
@@ -235,8 +220,6 @@ export function TemplateBuilder({
       case 0: return draft.targetColumns.length > 0 && !!draft.companyId;
       case 1: return draft.targetColumns.length > 0;
       case 2: return draft.sourceColumns.length > 0;
-      // Map-columns: need the index keys AND a column each for the computed
-      // Check-In and Check-Out, or the engine has nowhere to write the times.
       case 3:
         return (
           !!draft.employeeColumn &&
@@ -260,7 +243,6 @@ export function TemplateBuilder({
       } else {
         await createTemplate(finalPayload);
       }
-      // Saved — drop the persisted draft so a new build starts clean.
       useBuilderStore.persist.clearStorage();
       reset("", emptyDraft(companies[0]?.id ?? ""));
       router.push("/admin/templates");
@@ -343,9 +325,6 @@ export function TemplateBuilder({
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* Steps                                                                       */
-/* -------------------------------------------------------------------------- */
 
 function StepTarget({
   draft,
@@ -413,9 +392,6 @@ function StepTarget({
 function StepConfirm({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => void }) {
   const dateFmt = draft.targetColumns.find((c) => c.format?.dateFormat)?.format?.dateFormat ?? "DD/MM/YYYY";
   const timeFmt = draft.targetColumns.find((c) => c.format?.timeFormat)?.format?.timeFormat ?? "h:mm AM/PM";
-  // One global date/time format, written to every non-blank column. Each column
-  // applies only the part matching its own detected type when writing cells, so
-  // the field stays editable even when nothing was auto-detected as a date/time.
   const setFormat = (patch: { dateFormat?: string; timeFormat?: string }) =>
     set({
       targetColumns: draft.targetColumns.map((c) =>

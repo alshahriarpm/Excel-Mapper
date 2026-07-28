@@ -5,7 +5,6 @@ import { Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/atoms/ui/input";
 import { cn } from "@/lib/utils";
 
-/** Password field with a show/hide (eye) toggle. */
 export function PasswordInput({
   value,
   onChange,

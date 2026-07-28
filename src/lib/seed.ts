@@ -38,7 +38,6 @@ export async function seedAdminFromEnv(): Promise<void> {
     return;
   }
 
-  // Supabase Auth admin API (GoTrue) — used only to create the auth account.
   const admin = createClient<Database>(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -54,7 +53,6 @@ export async function seedAdminFromEnv(): Promise<void> {
     });
 
     if (error) {
-      // Already exists (or transient) — locate the profile row via Prisma.
       const existing = await prisma.profiles.findFirst({
         where: { email },
         select: { id: true },
@@ -75,9 +73,6 @@ export async function seedAdminFromEnv(): Promise<void> {
     }
 
     if (userId) {
-      // Upsert (not a bare update): if the on_auth_user_created trigger did not
-      // insert the profile row, an update would match zero rows and silently
-      // leave the account with no super_admin role. Prisma throws on failure.
       await prisma.profiles.upsert({
         where: { id: userId },
         create: { id: userId, email, full_name: fullName, role: "super_admin" },

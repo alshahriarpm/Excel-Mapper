@@ -7,7 +7,6 @@ import { SUPABASE_URL, SUPABASE_PUBLIC_KEY, getSupabaseSecretKey } from "@/lib/s
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
-/** Server-side Supabase client bound to the request's cookies (RLS applies). */
 export async function createClient() {
   const cookieStore = await cookies();
   return createServerClient<Database>(
@@ -24,8 +23,6 @@ export async function createClient() {
               cookieStore.set(name, value, options),
             );
           } catch {
-            // Called from a Server Component — safe to ignore; middleware
-            // refreshes the session cookie.
           }
         },
       },
@@ -33,10 +30,6 @@ export async function createClient() {
   );
 }
 
-/**
- * Service-role client for privileged admin actions ONLY (e.g. creating a
- * company's first HR user). Never expose to the browser; bypasses RLS.
- */
 export function createAdminClient() {
   const key = getSupabaseSecretKey();
   if (!key) {

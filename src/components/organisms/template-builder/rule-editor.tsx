@@ -63,7 +63,6 @@ export function RuleEditor({
   return (
     <Card className={rule.active ? "" : "opacity-60"}>
       <CardContent className="space-y-4 p-5">
-        {/* Header row */}
         <div className="flex items-center gap-2">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-xs font-medium">
             {index + 1}
@@ -87,7 +86,6 @@ export function RuleEditor({
           </div>
         </div>
 
-        {/* Conditions */}
         <div className="space-y-2 rounded-lg bg-secondary/40 p-3">
           {rule.conditions.length === 0 && (
             <p className="text-sm text-muted-foreground">Applies to every row (no conditions).</p>
@@ -152,7 +150,6 @@ export function RuleEditor({
           </div>
         </div>
 
-        {/* In / Out sources */}
         <div className="space-y-3">
           <div>
             <Label className="mb-1.5 block text-xs uppercase tracking-wide text-muted-foreground">For Check-In</Label>
@@ -178,7 +175,6 @@ export function RuleEditor({
 
         <Separator />
 
-        {/* Missing-value behavior */}
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <Label className="mb-1.5 block text-xs uppercase tracking-wide text-muted-foreground">If Check-In is missing</Label>

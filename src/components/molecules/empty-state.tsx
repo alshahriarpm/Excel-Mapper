@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 
-/** Friendly illustrated empty state. Icon is passed in (lucide) for variety. */
 export function EmptyState({
   icon,
   title,

@@ -3,12 +3,6 @@
 import { cookies } from "next/headers";
 import { DEMO, DEMO_ROLE_COOKIE, DEMO_EMAIL_COOKIE } from "@/lib/demo";
 
-/**
- * Demo-only sign in. There is no backend, so the role is decided by checking
- * the email against the seeded admin (SEED_ADMIN_EMAIL) — exactly the "role
- * from the account" model, minus the database. Any other email explores the
- * HR side. Disabled entirely outside demo mode.
- */
 export async function signInDemo(
   email: string,
   password: string,
