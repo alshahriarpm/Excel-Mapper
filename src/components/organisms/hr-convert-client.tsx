@@ -7,6 +7,7 @@ import { Button } from "@/components/atoms/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/atoms/ui/card";
 import { FileDropzone } from "@/components/molecules/file-dropzone";
 import { LoadingProgress } from "@/components/molecules/loading-progress";
+import { UploadedListInput } from "@/components/molecules/uploaded-list-input";
 import { ConversionReview } from "@/components/organisms/conversion-review";
 import { parseWorkbook, sheetToSourceRows, ParseError } from "@/lib/engine/fileParser";
 import { normalizeHeader } from "@/lib/engine/normalize";
@@ -14,6 +15,15 @@ import { logConversion } from "@/lib/actions/conversions";
 import type { SavedConversionTemplate, SourceRow } from "@/lib/engine/types";
 
 type Phase = "upload" | "parsing" | "review" | "error";
+
+/** True when any rule matches on the ID list HR supplies at conversion time. */
+function usesUploadedList(template: SavedConversionTemplate): boolean {
+  return template.rules.some((r) =>
+    r.conditions.some(
+      (c) => c.operator === "in_uploaded_list" || c.operator === "not_in_uploaded_list",
+    ),
+  );
+}
 
 export function HrConvertClient({
   template,
@@ -29,6 +39,8 @@ export function HrConvertClient({
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
   const [missingColumns, setMissingColumns] = useState<string[]>([]);
+  const [uploadedList, setUploadedList] = useState<string[]>([]);
+  const needsList = usesUploadedList(template);
 
   async function handleFile(file: File) {
     setPhase("parsing");
@@ -65,6 +77,7 @@ export function HrConvertClient({
     setFileName("");
     setError("");
     setMissingColumns([]);
+    setUploadedList([]);
   }
 
   return (
@@ -90,6 +103,14 @@ export function HrConvertClient({
             <p className="mt-3 text-xs text-muted-foreground">
               Your file is processed entirely in your browser — it never leaves your computer.
             </p>
+            {needsList && (
+              <div className="mt-4">
+                <UploadedListInput values={uploadedList} onChange={setUploadedList} />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  You can also add or change this after uploading your attendance file.
+                </p>
+              </div>
+            )}
             {sampleRows && sampleRows.length > 0 && (
               <div className="mt-4 flex items-center gap-3">
                 <Button
@@ -163,9 +184,27 @@ export function HrConvertClient({
               Start over
             </Button>
           </div>
+          {needsList && (
+            <>
+              <UploadedListInput values={uploadedList} onChange={setUploadedList} />
+              {uploadedList.length === 0 && (
+                <div className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning-foreground" />
+                  <div className="text-sm">
+                    <p className="font-medium">No overnight IDs added yet.</p>
+                    <p className="text-muted-foreground">
+                      This template has a rule for employees whose shift runs overnight. Until you add
+                      their IDs above, those employees are treated as a normal day shift.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
           <ConversionReview
             template={template}
             sourceRows={rows}
+            uploadedList={uploadedList}
             onDownloaded={(_mode, summary) =>
               void logConversion({
                 templateId: template.id,

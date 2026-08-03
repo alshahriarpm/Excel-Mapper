@@ -31,11 +31,13 @@ export function ConversionReview({
   template,
   sourceRows,
   fileNameOverride,
+  uploadedList,
   onDownloaded,
 }: {
   template: SavedConversionTemplate;
   sourceRows: SourceRow[];
   fileNameOverride?: string;
+  uploadedList?: string[];
   onDownloaded?: (mode: OutputExportMode, summary: ConversionResult["summary"]) => void;
 }) {
   const result = useMemo(
@@ -47,8 +49,9 @@ export function ConversionReview({
         rules: template.rules,
         defaultRule: template.defaultRule ?? null,
         uniqueTargetFields: template.uniqueTargetFields,
+        uploadedList,
       }),
-    [template, sourceRows],
+    [template, sourceRows, uploadedList],
   );
 
   const [filter, setFilter] = useState<Filter>("all");

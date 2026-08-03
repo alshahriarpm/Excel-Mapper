@@ -47,6 +47,8 @@ export type ConditionOperator =
   | "equals"
   | "not_equals"
   | "in"
+  | "in_uploaded_list"
+  | "not_in_uploaded_list"
   | "contains"
   | "not_contains"
   | "is_blank"
@@ -273,4 +275,5 @@ export type ConfigurableAttendanceTransformInput = {
   rules: ConversionRule[];
   defaultRule?: ConversionRule | null;
   uniqueTargetFields: string[];
+  uploadedList?: string[];
 };

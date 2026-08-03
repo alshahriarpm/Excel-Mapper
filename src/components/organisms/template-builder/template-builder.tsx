@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/atoms/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/atoms/ui/select";
 import { FileDropzone } from "@/components/molecules/file-dropzone";
 import { LoadingProgress } from "@/components/molecules/loading-progress";
+import { UploadedListInput } from "@/components/molecules/uploaded-list-input";
 import { WizardShell, type WizardStep } from "@/components/organisms/wizard-shell";
 import { ConversionReview } from "@/components/organisms/conversion-review";
 import { RuleEditor } from "./rule-editor";
@@ -623,13 +624,26 @@ function StepDuplicates({ draft, set }: { draft: Draft; set: (p: Partial<Draft>)
 }
 
 function StepReview({ template, rows }: { template: SavedConversionTemplate; rows: SourceRow[] }) {
+  const [uploadedList, setUploadedList] = useState<string[]>([]);
+  const needsList = template.rules.some((r) =>
+    r.conditions.some(
+      (c) => c.operator === "in_uploaded_list" || c.operator === "not_in_uploaded_list",
+    ),
+  );
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">Upload a source file (step 3) to test your rules against real rows.</p>;
   }
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">Here&apos;s how your rules handle the uploaded sample. Fix anything that looks off before publishing.</p>
-      <ConversionReview template={template} sourceRows={rows} />
+      {needsList && (
+        <UploadedListInput
+          values={uploadedList}
+          onChange={setUploadedList}
+          description="Your rules use a list HR uploads at conversion time. Add a few IDs here to test that rule now."
+        />
+      )}
+      <ConversionReview template={template} sourceRows={rows} uploadedList={uploadedList} />
     </div>
   );
 }

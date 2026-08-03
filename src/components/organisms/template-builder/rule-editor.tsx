@@ -16,6 +16,8 @@ const OPERATOR_LABELS: Record<ConditionOperator, string> = {
   equals: "is equal to",
   not_equals: "is not equal to",
   in: "is one of these values",
+  in_uploaded_list: "is in the list HR uploads",
+  not_in_uploaded_list: "is not in the list HR uploads",
   contains: "contains",
   not_contains: "does not contain",
   is_blank: "is blank",
@@ -23,6 +25,8 @@ const OPERATOR_LABELS: Record<ConditionOperator, string> = {
   starts_with: "starts with",
   ends_with: "ends with",
 };
+
+const USES_UPLOADED_LIST: ConditionOperator[] = ["in_uploaded_list", "not_in_uploaded_list"];
 
 const NEEDS_VALUES: ConditionOperator[] = [
   "equals",
@@ -114,6 +118,11 @@ export function RuleEditor({
                   value={cond.values.join(", ")}
                   onChange={(e) => updateCondition(i, { values: e.target.value.split(",").map((s) => s.trim()) })}
                 />
+              )}
+              {USES_UPLOADED_LIST.includes(cond.operator) && (
+                <span className="text-xs text-muted-foreground">
+                  (HR supplies this list when they convert)
+                </span>
               )}
               <Button
                 variant="ghost"

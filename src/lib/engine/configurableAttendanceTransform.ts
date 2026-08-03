@@ -62,12 +62,19 @@ function conditionMatches(
   row: SourceRow,
   resolveColumn: (name: string) => string | undefined,
   normalization: ConfigurableAttendanceTransformInput["sourceConfiguration"]["normalization"],
+  uploadedList?: Set<string>,
 ): boolean {
   const key = resolveColumn(cond.sourceColumn);
   const value: CellValue = key ? (row[key] ?? null) : null;
 
   if (cond.operator === "is_blank") return isBlank(value);
   if (cond.operator === "is_not_blank") return !isBlank(value);
+
+  if (cond.operator === "in_uploaded_list" || cond.operator === "not_in_uploaded_list") {
+    const inList =
+      !isBlank(value) && !!uploadedList && uploadedList.has(canonicalAlias(value, normalization));
+    return cond.operator === "in_uploaded_list" ? inList : !inList;
+  }
 
   const nv = canonicalAlias(value, normalization);
   const targets = cond.values.map((v) => canonicalAlias(v, normalization));
@@ -101,9 +108,12 @@ function ruleMatches(
   row: SourceRow,
   resolveColumn: (name: string) => string | undefined,
   normalization: ConfigurableAttendanceTransformInput["sourceConfiguration"]["normalization"],
+  uploadedList?: Set<string>,
 ): boolean {
   if (rule.conditions.length === 0) return true;
-  const results = rule.conditions.map((c) => conditionMatches(c, row, resolveColumn, normalization));
+  const results = rule.conditions.map((c) =>
+    conditionMatches(c, row, resolveColumn, normalization, uploadedList),
+  );
   return rule.conditionJoin === "or" ? results.some(Boolean) : results.every(Boolean);
 }
 
@@ -269,6 +279,12 @@ export function runConfigurableAttendanceTransform(
   const normalization = sourceConfiguration.normalization;
   const resolveColumn = makeColumnResolver(sourceRows);
 
+  const uploadedList = new Set(
+    (input.uploadedList ?? [])
+      .map((v) => canonicalAlias(v, normalization))
+      .filter((v) => v !== ""),
+  );
+
   const index = buildEmployeeDateIndex(
     sourceRows,
     sourceConfiguration.employeeColumn,
@@ -295,7 +311,7 @@ export function runConfigurableAttendanceTransform(
     let appliedRule: ConversionRule | null = null;
     let additionalMatches = 0;
     for (const rule of activeRules) {
-      if (ruleMatches(rule, row, resolveColumn, normalization)) {
+      if (ruleMatches(rule, row, resolveColumn, normalization, uploadedList)) {
         if (!appliedRule) {
           appliedRule = rule;
           if (rule.stopAfterMatch) break;

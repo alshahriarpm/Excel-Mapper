@@ -22,6 +22,7 @@ function convert(
     target?: TargetWorkbookConfiguration;
     source?: SourceConfiguration;
     unique?: string[];
+    uploadedList?: string[];
   } = {},
 ) {
   return runConfigurableAttendanceTransform({
@@ -31,6 +32,7 @@ function convert(
     rules: opts.rules ?? [overnightRule(), regularRule()],
     defaultRule: opts.defaultRule ?? null,
     uniqueTargetFields: opts.unique ?? ["emp", "date"],
+    uploadedList: opts.uploadedList,
   });
 }
 
@@ -303,5 +305,88 @@ describe("Related-date processing (spec §21)", () => {
     ]);
     const overnightRow = res.rows.find((r) => r.appliedRuleName === "Overnight Attendance")!;
     expect(val(overnightRow, "out")).toBe("7:00 AM");
+  });
+});
+
+describe("Overnight shift by uploaded employee-ID list", () => {
+  // Roster rule first so it wins for listed employees, day rule second.
+  const rosterRule = () =>
+    overnightRule({
+      name: "Overnight roster",
+      conditions: [{ sourceColumn: "UserID", operator: "in_uploaded_list", values: [] }],
+      order: 0,
+    });
+  const dayRule = () => regularRule({ order: 1 });
+
+  const twoDays = () => [
+    row({ UserID: "SS200", Date: "14/07/2026", "On Desc": "", "A M OnDuty": "8:00 PM", "P M OffDuty": "9:00 PM" }),
+    row({ UserID: "SS200", Date: "15/07/2026", "On Desc": "", "A M OnDuty": "6:30 AM", "P M OffDuty": "10:00 PM" }),
+    row({ UserID: "E900", Date: "14/07/2026", "On Desc": "", "A M OnDuty": "9:00 AM", "P M OffDuty": "6:00 PM" }),
+  ];
+
+  it("listed employee takes In from the same day's PM and Out from the next day's AM", () => {
+    const res = convert(twoDays(), { rules: [rosterRule(), dayRule()], uploadedList: ["SS200"] });
+    const july14 = res.rows[0]!;
+    expect(july14.appliedRuleName).toBe("Overnight roster");
+    expect(val(july14, "in")).toBe("9:00 PM"); // 14 July P M OffDuty
+    expect(val(july14, "out")).toBe("6:30 AM"); // 15 July A M OnDuty
+    expect(val(july14, "date")).toBe("14/07/2026"); // row keeps its own date
+    expect(july14.status).toBe("ready");
+  });
+
+  it("an employee not on the list keeps normal day-shift handling", () => {
+    const res = convert(twoDays(), { rules: [rosterRule(), dayRule()], uploadedList: ["SS200"] });
+    const dayRow = res.rows[2]!;
+    expect(dayRow.appliedRuleName).toBe("Regular Attendance");
+    expect(val(dayRow, "in")).toBe("9:00 AM");
+    expect(val(dayRow, "out")).toBe("6:00 PM");
+  });
+
+  it("the roster rule beats the day rule even when On Desc would match it", () => {
+    const rows = [
+      row({ UserID: "SS200", Date: "14/07/2026", "On Desc": "Arrive Late", "A M OnDuty": "8:00 PM", "P M OffDuty": "9:00 PM" }),
+      row({ UserID: "SS200", Date: "15/07/2026", "On Desc": "Absent", "A M OnDuty": "6:30 AM" }),
+    ];
+    const res = convert(rows, { rules: [rosterRule(), dayRule()], uploadedList: ["SS200"] });
+    expect(res.rows[0]!.appliedRuleName).toBe("Overnight roster");
+    expect(val(res.rows[0]!, "out")).toBe("6:30 AM");
+  });
+
+  it("matching ignores case and surrounding spaces", () => {
+    const res = convert(twoDays(), { rules: [rosterRule(), dayRule()], uploadedList: ["  ss200 "] });
+    expect(res.rows[0]!.appliedRuleName).toBe("Overnight roster");
+    expect(val(res.rows[0]!, "in")).toBe("9:00 PM");
+  });
+
+  it("without a list the roster rule matches nobody and the day rule applies", () => {
+    const res = convert(twoDays(), { rules: [rosterRule(), dayRule()] });
+    expect(res.rows.every((r) => r.appliedRuleName !== "Overnight roster")).toBe(true);
+    expect(val(res.rows[0]!, "in")).toBe("8:00 PM"); // day logic: A M OnDuty
+  });
+
+  it("no next-day record keeps Check-In and flags the row for review", () => {
+    const res = convert(
+      [row({ UserID: "SS200", Date: "14/07/2026", "On Desc": "", "A M OnDuty": "8:00 PM", "P M OffDuty": "9:00 PM" })],
+      { rules: [rosterRule(), dayRule()], uploadedList: ["SS200"] },
+    );
+    const r = res.rows[0]!;
+    expect(val(r, "in")).toBe("9:00 PM");
+    expect(val(r, "out")).toBeNull();
+    expect(r.status).not.toBe("ready");
+  });
+
+  it("not_in_uploaded_list inverts the match", () => {
+    const res = convert(twoDays(), {
+      rules: [
+        rosterRule(),
+        regularRule({
+          order: 1,
+          conditions: [{ sourceColumn: "UserID", operator: "not_in_uploaded_list", values: [] }],
+        }),
+      ],
+      uploadedList: ["SS200"],
+    });
+    expect(res.rows[0]!.appliedRuleName).toBe("Overnight roster");
+    expect(res.rows[2]!.appliedRuleName).toBe("Regular Attendance");
   });
 });
