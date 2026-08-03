@@ -391,7 +391,7 @@ function StepTarget({
 }
 
 function StepConfirm({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => void }) {
-  const dateFmt = draft.targetColumns.find((c) => c.format?.dateFormat)?.format?.dateFormat ?? "DD/MM/YYYY";
+  const dateFmt = draft.targetColumns.find((c) => c.format?.dateFormat)?.format?.dateFormat ?? "YYYY-MM-DD";
   const timeFmt = draft.targetColumns.find((c) => c.format?.timeFormat)?.format?.timeFormat ?? "h:mm AM/PM";
   const setFormat = (patch: { dateFormat?: string; timeFormat?: string }) =>
     set({

@@ -78,6 +78,20 @@ function extractCellValue(raw: ExcelJS.CellValue): CellValue {
 const TIME_RE = /^\d{1,2}:\d{2}(:\d{2})?(\s*[AaPp][Mm])?$/;
 const DATE_RE = /^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}/;
 
+/**
+ * Date pattern of an unformatted date string, so a column holding "2026-07-19"
+ * is reported as YYYY-MM-DD rather than being assumed day-first. Only the
+ * year's position is inferable; a leading 1-2 digit field stays day-first.
+ */
+function guessDateFormat(value: string): string {
+  const s = value.trim();
+  const sep = s.match(/^\d{1,4}([-/.])/)?.[1] ?? "-";
+  if (/^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}/.test(s)) {
+    return ["YYYY", "MM", "DD"].join(sep);
+  }
+  return ["DD", "MM", "YYYY"].join(sep === "-" ? "/" : sep);
+}
+
 function detectType(value: CellValue, numFmt?: string): { type: TargetColumnType; format?: TargetColumnFormat } {
   if (numFmt) {
     const f = numFmt.toLowerCase();
@@ -89,11 +103,13 @@ function detectType(value: CellValue, numFmt?: string): { type: TargetColumnType
     if (/[0#]/.test(f) && !/@/.test(f)) return { type: "number", format: { numberFormat: numFmt } };
     if (f === "@") return { type: "text", format: { preserveLeadingZeros: true } };
   }
-  if (value instanceof Date) return { type: "date", format: { dateFormat: "DD/MM/YYYY" } };
+  // A real date cell with no number format carries no display hint; ISO is the
+  // unambiguous default.
+  if (value instanceof Date) return { type: "date", format: { dateFormat: "YYYY-MM-DD" } };
   if (typeof value === "number") return { type: "number" };
   if (typeof value === "string") {
     if (TIME_RE.test(value.trim())) return { type: "time", format: { timeFormat: "h:mm AM/PM" } };
-    if (DATE_RE.test(value.trim())) return { type: "date", format: { dateFormat: "DD/MM/YYYY" } };
+    if (DATE_RE.test(value.trim())) return { type: "date", format: { dateFormat: guessDateFormat(value) } };
     if (/^0\d+$/.test(value.trim())) return { type: "text", format: { preserveLeadingZeros: true } };
   }
   return { type: "text" };

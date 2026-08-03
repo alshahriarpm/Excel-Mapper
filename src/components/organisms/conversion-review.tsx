@@ -5,12 +5,21 @@ import { CheckCircle2, Clock, Download, FileWarning, Layers, AlertTriangle } fro
 import { Button } from "@/components/atoms/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/atoms/ui/card";
 import { Checkbox } from "@/components/atoms/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/atoms/ui/dialog";
 import { SummaryCard } from "@/components/molecules/summary-card";
 import { StatusBadge } from "@/components/molecules/status-badge";
 import { EmptyState } from "@/components/molecules/empty-state";
 import { runConfigurableAttendanceTransform, summarize } from "@/lib/engine/configurableAttendanceTransform";
 import { generateTargetFile, rowsForOutput } from "@/lib/engine/targetFileGenerator";
 import { formatCellForDisplay } from "@/lib/engine/format";
+import { isBlank } from "@/lib/engine/normalize";
 import { triggerDownload } from "@/lib/download";
 import { cn } from "@/lib/utils";
 import type {
@@ -56,6 +65,7 @@ export function ConversionReview({
 
   const [filter, setFilter] = useState<Filter>("all");
   const [busy, setBusy] = useState(false);
+  const [warnIncomplete, setWarnIncomplete] = useState(false);
   const [pageSize, setPageSize] = useState(50);
   const [page, setPage] = useState(1);
 
@@ -114,10 +124,30 @@ export function ConversionReview({
     [result.rows, showPrefixFilter, selectedPrefixes, prefixOf],
   );
   const readyCount = useMemo(() => rowsForOutput(downloadRows, "valid_only", columns).length, [downloadRows, columns]);
-  const includeCount = useMemo(
-    () => rowsForOutput(downloadRows, "include_incomplete", columns).length,
+  const exportRows = useMemo(
+    () => rowsForOutput(downloadRows, "include_incomplete", columns),
     [downloadRows, columns],
   );
+  const includeCount = exportRows.length;
+
+  // Records that will be written with a Check-In or Check-Out still empty —
+  // they must be completed before the file is uploaded to the HR system.
+  const incomplete = useMemo(() => {
+    const inKey = columns.find((c) => c.mapping.kind === "in_time" || c.role === "in_time")?.key;
+    const outKey = columns.find((c) => c.mapping.kind === "out_time" || c.role === "out_time")?.key;
+    if (!inKey || !outKey) return { rows: 0, missingIn: 0, missingOut: 0 };
+    let rows = 0;
+    let missingIn = 0;
+    let missingOut = 0;
+    for (const r of exportRows) {
+      const noIn = isBlank(r.cells[inKey]?.value ?? null);
+      const noOut = isBlank(r.cells[outKey]?.value ?? null);
+      if (noIn) missingIn++;
+      if (noOut) missingOut++;
+      if (noIn || noOut) rows++;
+    }
+    return { rows, missingIn, missingOut };
+  }, [exportRows, columns]);
 
   const visibleRows = useMemo(() => {
     if (filter === "all") return downloadRows;
@@ -325,13 +355,31 @@ export function ConversionReview({
           </dl>
           <div className="flex flex-wrap gap-3">
             <Button
-              onClick={() => download("include_incomplete")}
+              onClick={() =>
+                incomplete.rows > 0 ? setWarnIncomplete(true) : void download("include_incomplete")
+              }
               disabled={busy || includeCount === 0}
               loading={busy}
             >
               <Download className="h-4 w-4" /> Download template ({includeCount})
             </Button>
           </div>
+          {incomplete.rows > 0 && (
+            <div className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning-foreground" />
+              <div className="text-sm">
+                <p className="font-medium">
+                  {incomplete.rows} of {includeCount} records are incomplete.
+                </p>
+                <p className="text-muted-foreground">
+                  {incomplete.missingIn > 0 && <>{incomplete.missingIn} missing a Check-In</>}
+                  {incomplete.missingIn > 0 && incomplete.missingOut > 0 && " · "}
+                  {incomplete.missingOut > 0 && <>{incomplete.missingOut} missing a Check-Out</>}
+                  . Fill these in before you upload the file to your HR system.
+                </p>
+              </div>
+            </div>
+          )}
           <p className="text-xs text-muted-foreground">
             The downloaded file uses your saved target format, worksheet, column order and filename.
             Every record with a Check-In or a Check-Out is included ({readyCount} ready and{" "}
@@ -340,6 +388,51 @@ export function ConversionReview({
           </p>
         </CardContent>
       </Card>
+
+      <Dialog open={warnIncomplete} onOpenChange={(o) => !o && !busy && setWarnIncomplete(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-warning-foreground" />
+              Some records are incomplete
+            </DialogTitle>
+            <DialogDescription>
+              {incomplete.rows} of the {includeCount} records in this file still need a punch time.
+              Please complete them before uploading the file to your HR system.
+            </DialogDescription>
+          </DialogHeader>
+
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-lg border border-border p-3">
+              <dt className="text-muted-foreground">Missing Check-In</dt>
+              <dd className="text-lg font-semibold">{incomplete.missingIn}</dd>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <dt className="text-muted-foreground">Missing Check-Out</dt>
+              <dd className="text-lg font-semibold">{incomplete.missingOut}</dd>
+            </div>
+          </dl>
+          <p className="text-xs text-muted-foreground">
+            Tip: the summary cards above filter the table to exactly these records, so you can see who
+            they are before you download.
+          </p>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setWarnIncomplete(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                await download("include_incomplete");
+                setWarnIncomplete(false);
+              }}
+              loading={busy}
+            >
+              <Download className="h-4 w-4" /> Download anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

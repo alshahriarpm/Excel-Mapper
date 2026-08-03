@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/atoms/ui/card";
 import { Input } from "@/components/atoms/ui/input";
@@ -27,6 +28,33 @@ const OPERATOR_LABELS: Record<ConditionOperator, string> = {
 };
 
 const USES_UPLOADED_LIST: ConditionOperator[] = ["in_uploaded_list", "not_in_uploaded_list"];
+
+/**
+ * Comma-separated condition values. The text you type is held locally and is
+ * never re-derived from the saved values, so splitting/trimming for storage
+ * can't rewrite the field mid-edit (typing a space or backspacing used to fight
+ * the round-trip). Stored values stay trimmed.
+ */
+function ConditionValuesInput({
+  initialValues,
+  onChange,
+}: {
+  initialValues: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const [text, setText] = useState(() => initialValues.join(", "));
+  return (
+    <Input
+      className="h-9 w-56"
+      placeholder="values, comma-separated"
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        onChange(e.target.value.split(",").map((s) => s.trim()));
+      }}
+    />
+  );
+}
 
 const NEEDS_VALUES: ConditionOperator[] = [
   "equals",
@@ -112,14 +140,10 @@ export function RuleEditor({
                 </SelectContent>
               </Select>
               {NEEDS_VALUES.includes(cond.operator) && (
-                <Input
-                  className="h-9 w-56"
-                  placeholder="values, comma-separated"
-                  value={cond.values.join(", ")}
-                  // Kept untrimmed while typing, otherwise the space after a
-                  // comma (or between words) is stripped before the next
-                  // keystroke lands. Matching normalizes/trims anyway.
-                  onChange={(e) => updateCondition(i, { values: e.target.value.split(",") })}
+                <ConditionValuesInput
+                  key={`${rule.id}-${i}-values`}
+                  initialValues={cond.values}
+                  onChange={(values) => updateCondition(i, { values })}
                 />
               )}
               {USES_UPLOADED_LIST.includes(cond.operator) && (

@@ -97,4 +97,19 @@ describe("Workbook parsing", () => {
     const empty = makeXls([[""]]);
     await expect(parseWorkbook(empty, "empty.xls")).rejects.toThrow(/\.xlsx/);
   });
+
+  it("reads the date format from the file instead of assuming day-first", async () => {
+    const bytes = await makeXlsx((ws) => {
+      ws.getRow(1).values = ["Employee ID*", "ISO Date", "Slashed Date"];
+      ws.getRow(2).values = ["EMP001", "2023-01-01", "14/07/2026"];
+      ws.getRow(3).values = ["EMP002", "2023-01-02", "15/07/2026"];
+    });
+    const sheet = (await parseWorkbook(bytes, "t.xlsx")).sheets["Attendance"]!;
+    const iso = sheet.columns.find((c) => c.header === "ISO Date")!;
+    const slashed = sheet.columns.find((c) => c.header === "Slashed Date")!;
+    expect(iso.detectedType).toBe("date");
+    expect(iso.format?.dateFormat).toBe("YYYY-MM-DD");
+    expect(slashed.detectedType).toBe("date");
+    expect(slashed.format?.dateFormat).toBe("DD/MM/YYYY");
+  });
 });
