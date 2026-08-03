@@ -116,7 +116,10 @@ export function RuleEditor({
                   className="h-9 w-56"
                   placeholder="values, comma-separated"
                   value={cond.values.join(", ")}
-                  onChange={(e) => updateCondition(i, { values: e.target.value.split(",").map((s) => s.trim()) })}
+                  // Kept untrimmed while typing, otherwise the space after a
+                  // comma (or between words) is stripped before the next
+                  // keystroke lands. Matching normalizes/trims anyway.
+                  onChange={(e) => updateCondition(i, { values: e.target.value.split(",") })}
                 />
               )}
               {USES_UPLOADED_LIST.includes(cond.operator) && (
