@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/atoms/ui/button";
 import { BackButton } from "@/components/molecules/back-button";
+import { accentTextClass, type PosterTone } from "./poster-shell";
 
 function Lift({ children }: { children: React.ReactNode }) {
   const still = useReducedMotion();
@@ -21,17 +23,23 @@ function Lift({ children }: { children: React.ReactNode }) {
 
 export function ErrorActions({
   primary,
-  homeHref,
-  homeLabel = "Go home",
   backFallbackHref = "/",
+  accentLink,
+  tone = "primary",
 }: {
-  primary?: { label: string; onClick: () => void; loading?: boolean; disabled?: boolean; icon?: React.ReactNode };
-  homeHref: string;
-  homeLabel?: string;
+  primary?: {
+    label: string;
+    onClick: () => void;
+    loading?: boolean;
+    disabled?: boolean;
+    icon?: React.ReactNode;
+  };
   backFallbackHref?: string;
+  accentLink?: { href: string; label: string };
+  tone?: PosterTone;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       {primary && (
         <Lift>
           <Button
@@ -46,13 +54,19 @@ export function ErrorActions({
         </Lift>
       )}
       <Lift>
-        <Button variant="outline" asChild>
-          <Link href={homeHref}>{homeLabel}</Link>
-        </Button>
+        <BackButton label="Go back" fallbackHref={backFallbackHref} variant="outline" size="default" />
       </Lift>
-      <Lift>
-        <BackButton label="Go back" fallbackHref={backFallbackHref} />
-      </Lift>
+      {accentLink && (
+        <Link
+          href={accentLink.href}
+          className={cn(
+            "ml-1 rounded-sm text-sm font-semibold underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+            accentTextClass(tone),
+          )}
+        >
+          {accentLink.label}
+        </Link>
+      )}
     </div>
   );
 }

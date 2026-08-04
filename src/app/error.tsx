@@ -1,13 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { ErrorActions } from "@/components/error/error-actions";
 import { ErrorDetails } from "@/components/error/error-details";
-import { ErrorIllustration } from "@/components/error/error-illustration";
-import { ErrorShell } from "@/components/error/error-shell";
+import { MetaRows, type MetaRow } from "@/components/error/meta-rows";
+import { PosterShell } from "@/components/error/poster-shell";
 import { StatusMessage } from "@/components/error/status-message";
 import { useOnlineStatus } from "@/components/error/use-online-status";
+
+function formatUtc(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(
+    date.getUTCHours(),
+  )}:${pad(date.getUTCMinutes())} UTC`;
+}
 
 export default function ErrorBoundary({
   error,
@@ -18,9 +25,11 @@ export default function ErrorBoundary({
 }) {
   const { online, restored } = useOnlineStatus();
   const [retrying, setRetrying] = useState(false);
+  const [occurredAt, setOccurredAt] = useState("");
 
   useEffect(() => {
     console.error("Unhandled error:", error);
+    setOccurredAt(formatUtc(new Date()));
   }, [error]);
 
   useEffect(() => {
@@ -35,35 +44,43 @@ export default function ErrorBoundary({
     reset();
   }, [retrying, online, reset]);
 
+  const rows: MetaRow[] = [{ label: "Code", value: "500 · SERVER_ERROR" }];
+  if (occurredAt) rows.push({ label: "Time", value: occurredAt });
+
   return (
-    <ErrorShell
+    <PosterShell
       alert
       tone="destructive"
+      code="500"
+      kindLabel="Server error"
+      footNote={process.env.NODE_ENV === "development" ? error.digest : undefined}
       title="Something went wrong"
       description="We couldn't complete your request. Don't worry—your data is safe."
-      illustration={
-        <ErrorIllustration tone="destructive" idle="pulse" icon={<AlertTriangle aria-hidden />} />
-      }
-      status={<StatusMessage online={online} restored={restored} />}
+      navLinks={[{ href: "/", label: "Home" }]}
       actions={
-        <ErrorActions
-          primary={{
-            label: retrying ? "Retrying…" : "Retry",
-            onClick: retry,
-            loading: retrying,
-            disabled: !online || retrying,
-            icon: retrying ? undefined : <RotateCcw aria-hidden className="h-4 w-4" />,
-          }}
-          homeHref="/"
-        />
+        <div className="space-y-5">
+          <StatusMessage online={online} restored={restored} />
+          <ErrorActions
+            tone="destructive"
+            primary={{
+              label: retrying ? "Retrying…" : "Retry",
+              onClick: retry,
+              loading: retrying,
+              disabled: !online || retrying,
+              icon: retrying ? undefined : <RotateCcw aria-hidden className="h-4 w-4" />,
+            }}
+            accentLink={{ href: "/", label: "Dashboard" }}
+          />
+          <p className="text-xs text-muted-foreground">
+            {online
+              ? "If it keeps happening, let your administrator know."
+              : "Reconnect to the internet and Retry will become available again."}
+          </p>
+        </div>
       }
     >
-      <p className="mt-6 text-xs text-muted-foreground">
-        {online
-          ? "If it keeps happening, let your administrator know."
-          : "Reconnect to the internet and Retry will become available again."}
-      </p>
+      <MetaRows rows={rows} />
       <ErrorDetails error={error} />
-    </ErrorShell>
+    </PosterShell>
   );
 }
