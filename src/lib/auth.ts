@@ -24,12 +24,22 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
   return (await getSessionOutcome()).session;
 }
 
+const PROFILE_FIELDS = {
+  id: true,
+  email: true,
+  full_name: true,
+  role: true,
+  company_id: true,
+  blocked: true,
+  created_at: true,
+} as const;
+
 async function findProfile(userId: string) {
   try {
-    return await prisma.profiles.findUnique({ where: { id: userId } });
+    return await prisma.profiles.findUnique({ where: { id: userId }, select: PROFILE_FIELDS });
   } catch {
     await new Promise((resolve) => setTimeout(resolve, 150));
-    return await prisma.profiles.findUnique({ where: { id: userId } });
+    return await prisma.profiles.findUnique({ where: { id: userId }, select: PROFILE_FIELDS });
   }
 }
 
@@ -55,7 +65,7 @@ export async function getSessionOutcome(): Promise<{
     return { session: null, reason: "no-user" };
   }
 
-  let row: Awaited<ReturnType<typeof prisma.profiles.findUnique>>;
+  let row: Awaited<ReturnType<typeof findProfile>>;
   try {
     row = await findProfile(user.id);
   } catch (e) {
