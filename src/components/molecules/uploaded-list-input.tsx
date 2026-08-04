@@ -4,9 +4,11 @@ import { useState } from "react";
 import { ListChecks, Loader2, X } from "lucide-react";
 import { Button } from "@/components/atoms/ui/button";
 import { Textarea } from "@/components/atoms/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/atoms/ui/select";
 import { FileDropzone } from "@/components/molecules/file-dropzone";
-import { parseWorkbook } from "@/lib/engine/fileParser";
-import { cellToString } from "@/lib/engine/normalize";
+import { parseWorkbook, sheetToSourceRows } from "@/lib/engine/fileParser";
+import { columnValues, extractIds } from "@/lib/engine/idList";
+import type { CellValue } from "@/lib/engine/types";
 
 function splitPasted(text: string): string[] {
   return text
@@ -17,8 +19,9 @@ function splitPasted(text: string): string[] {
 
 /**
  * Collects the ID list a template's "is in the list HR uploads" condition needs
- * — by spreadsheet upload or by pasting. Every non-empty cell of the chosen file
- * is taken as an ID, so a single-column list works with or without a header.
+ * — by spreadsheet upload or by pasting. On upload the ID column is detected
+ * (and can be switched), so a roster with name/shift/date columns still yields
+ * only employee IDs.
  */
 export function UploadedListInput({
   values,
@@ -36,6 +39,10 @@ export function UploadedListInput({
   const [pasted, setPasted] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Parsed upload kept so the ID column can be switched without re-reading.
+  const [sheetRows, setSheetRows] = useState<Record<string, CellValue>[]>([]);
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [idColumn, setIdColumn] = useState("");
 
   async function onFile(file: File) {
     setBusy(true);
@@ -44,17 +51,13 @@ export function UploadedListInput({
       const parsed = await parseWorkbook(await file.arrayBuffer(), file.name);
       const sheet = parsed.sheets[parsed.suggestedWorksheet];
       if (!sheet) throw new Error("That file has no readable worksheet.");
-      const ids: string[] = [];
-      const seen = new Set<string>();
-      for (const row of sheet.rows) {
-        for (const cell of row) {
-          const s = cellToString(cell).trim();
-          if (!s || seen.has(s)) continue;
-          seen.add(s);
-          ids.push(s);
-        }
-      }
+      const rows = sheetToSourceRows(sheet);
+      const cols = sheet.columns.map((c) => c.header).filter(Boolean);
+      const { column: chosen, ids } = extractIds(rows, cols);
       if (ids.length === 0) throw new Error("No IDs found in that file.");
+      setSheetRows(rows);
+      setHeaders(cols);
+      setIdColumn(chosen);
       setFileName(parsed.fileName);
       onChange(ids);
     } catch (e) {
@@ -62,6 +65,11 @@ export function UploadedListInput({
     } finally {
       setBusy(false);
     }
+  }
+
+  function useColumn(header: string) {
+    setIdColumn(header);
+    onChange(columnValues(sheetRows, header));
   }
 
   function applyPasted(text: string) {
@@ -73,6 +81,9 @@ export function UploadedListInput({
     setFileName(null);
     setPasted("");
     setError("");
+    setSheetRows([]);
+    setHeaders([]);
+    setIdColumn("");
     onChange([]);
   }
 
@@ -130,6 +141,27 @@ export function UploadedListInput({
       )}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {mode === "upload" && headers.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">ID column</span>
+          <Select value={idColumn} onValueChange={useColumn}>
+            <SelectTrigger className="h-9 w-auto min-w-[160px]">
+              <SelectValue placeholder="column" />
+            </SelectTrigger>
+            <SelectContent>
+              {headers.map((h) => (
+                <SelectItem key={h} value={h}>
+                  {h}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-muted-foreground">
+            Other columns in the file are ignored.
+          </span>
+        </div>
+      )}
 
       {values.length > 0 && (
         <p className="text-xs text-muted-foreground">
