@@ -23,6 +23,19 @@ function summarize(error: unknown): ErrorSummary {
   return { name: "Unknown", message: scrub(String(error)) };
 }
 
+function authProjectRef(): string | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  return (url.match(/^https:\/\/([a-z0-9]+)\.supabase\.co/) || [])[1] ?? null;
+}
+
+function dbProjectRef(): string | null {
+  const direct = process.env.DATABASE_URL;
+  if (direct) {
+    return (direct.match(/\/\/postgres\.([a-z0-9]+):/) || [])[1] ?? "unparsed";
+  }
+  return process.env.SUPABASE_PROJECT_REF ?? null;
+}
+
 export async function GET() {
   const configured = {
     DATABASE_URL: Boolean(process.env.DATABASE_URL),
@@ -39,15 +52,33 @@ export async function GET() {
 
   let database: "ok" | "failed" = "ok";
   let error: ErrorSummary | undefined;
+  let profilesTable: "ok" | "failed" | "unknown" = "unknown";
+  let hasAnyProfiles: boolean | null = null;
 
   try {
     const { prisma } = await import("@/lib/db");
     await prisma.$queryRaw`select 1`;
+    try {
+      hasAnyProfiles = (await prisma.profiles.count()) > 0;
+      profilesTable = "ok";
+    } catch (e) {
+      profilesTable = "failed";
+      error = summarize(e);
+    }
   } catch (e) {
     database = "failed";
     error = summarize(e);
   }
 
-  const ok = database === "ok";
-  return NextResponse.json({ ok, database, error, configured }, { status: ok ? 200 : 503 });
+  const project = {
+    authProjectRef: authProjectRef(),
+    dbProjectRef: dbProjectRef(),
+    sameProject: authProjectRef() !== null && authProjectRef() === dbProjectRef(),
+  };
+
+  const ok = database === "ok" && profilesTable === "ok";
+  return NextResponse.json(
+    { ok, database, profilesTable, hasAnyProfiles, project, error, configured },
+    { status: ok ? 200 : 503 },
+  );
 }
