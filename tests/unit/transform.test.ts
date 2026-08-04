@@ -308,6 +308,43 @@ describe("Related-date processing (spec §21)", () => {
   });
 });
 
+describe('The "Blank" condition token', () => {
+  // The day rule as configured for Singer: On Desc equals Absent / Arrive late / Blank.
+  const dayOnly = () =>
+    regularRule({ order: 0, conditions: [{ sourceColumn: "On Desc", operator: "equals", values: ["Absent", "Arrive late", "Blank"] }] });
+
+  it("matches a blank cell — a clocked-in row whose punch-out never registered still converts", () => {
+    // Off Desc carries "Not Swipe"; On Desc is blank. The rule reads On Desc.
+    const res = convert(
+      [row({ UserID: "SS812", Date: "27/07/2026", "On Desc": "", "A M OnDuty": "06:36:45", "P M OffDuty": "" })],
+      { rules: [dayOnly()] },
+    );
+    const r = res.rows[0]!;
+    expect(r.appliedRuleName).toBe("Regular Attendance");
+    expect(val(r, "in")).toBe("06:36:45");
+    expect(val(r, "out")).toBeNull();
+    expect(r.status).toBe("missing_out_time");
+  });
+
+  it("does not over-match: a value that is present but unlisted matches no rule", () => {
+    const res = convert(
+      [row({ UserID: "SS812", Date: "27/07/2026", "On Desc": "Not Swipe", "A M OnDuty": "06:36:45", "P M OffDuty": "" })],
+      { rules: [dayOnly()] },
+    );
+    expect(res.rows[0]!.appliedRuleName).toBeNull();
+    expect(res.rows[0]!.status).toBe("no_matching_rule");
+  });
+
+  it("also matches a whitespace-only cell", () => {
+    const res = convert(
+      [row({ UserID: "SS812", Date: "27/07/2026", "On Desc": "   ", "A M OnDuty": "06:36:45", "P M OffDuty": "18:00" })],
+      { rules: [dayOnly()] },
+    );
+    expect(res.rows[0]!.appliedRuleName).toBe("Regular Attendance");
+    expect(res.rows[0]!.status).toBe("ready");
+  });
+});
+
 describe("Overnight shift by uploaded employee-ID list", () => {
   // Roster rule first so it wins for listed employees, day rule second.
   const rosterRule = () =>
