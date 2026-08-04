@@ -42,6 +42,12 @@ const NO_DATE = "(no date)";
 
 const ALIGNED_TYPES = new Set(["date", "time", "datetime", "number"]);
 
+const KEY_SEPARATOR = "\u0000";
+
+function splitSignature(signature: string): string[] {
+  return signature === "" ? [] : signature.split(KEY_SEPARATOR);
+}
+
 function isAlignedColumn(column: TargetColumnConfiguration, employeeKey?: string): boolean {
   return ALIGNED_TYPES.has(column.detectedType) || column.key === employeeKey;
 }
@@ -120,10 +126,11 @@ export function ConversionReview({
   }, [writableRows, prefixOf]);
 
   const showPrefixFilter = prefixCounts.length >= 2;
+  const prefixSignature = prefixCounts.map(([p]) => p).join(KEY_SEPARATOR);
   const [selectedPrefixes, setSelectedPrefixes] = useState<Set<string>>(new Set());
   useEffect(() => {
-    setSelectedPrefixes(new Set(prefixCounts.map(([p]) => p)));
-  }, [prefixCounts]);
+    setSelectedPrefixes(new Set(splitSignature(prefixSignature)));
+  }, [prefixSignature]);
   function togglePrefix(p: string, on: boolean) {
     setSelectedPrefixes((prev) => {
       const next = new Set(prev);
@@ -163,10 +170,11 @@ export function ConversionReview({
   }, [writableRows, dateOf]);
 
   const showDateFilter = dateCounts.length >= 2;
+  const dateSignature = dateCounts.map(([d]) => d).join(KEY_SEPARATOR);
   const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
   useEffect(() => {
-    setSelectedDates(new Set(dateCounts.map(([d]) => d)));
-  }, [dateCounts]);
+    setSelectedDates(new Set(splitSignature(dateSignature)));
+  }, [dateSignature]);
   function toggleDate(d: string, on: boolean) {
     setSelectedDates((prev) => {
       const next = new Set(prev);
