@@ -51,7 +51,6 @@ export function ConversionReview({
   sourceRows: SourceRow[];
   fileNameOverride?: string;
   uploadedList?: string[];
-  /** Producing the file is HR's step; the builder only previews the result. */
   allowDownload?: boolean;
   onDownloaded?: (mode: OutputExportMode, summary: ConversionResult["summary"]) => void;
 }) {
@@ -127,10 +126,6 @@ export function ConversionReview({
     });
   }
 
-  // --- Attendance date -------------------------------------------------------
-  // A file often spans more than one day because an overnight shift needs the
-  // next morning's punch to close it. Those extra days are lookup data, so the
-  // date a record belongs to decides whether it is written to the file.
   const dateKeyCol = useMemo(() => {
     const byRole = columns.find((c) => c.role === "date");
     if (byRole) return byRole.key;
@@ -155,7 +150,6 @@ export function ConversionReview({
       const d = dateOf(r);
       m.set(d, (m.get(d) ?? 0) + 1);
     }
-    // Chronological, with undated rows last.
     return [...m.entries()].sort((a, b) =>
       a[0] === NO_DATE ? 1 : b[0] === NO_DATE ? -1 : a[0].localeCompare(b[0]),
     );
@@ -191,8 +185,6 @@ export function ConversionReview({
   );
   const includeCount = exportRows.length;
 
-  // Records that will be written with a Check-In or Check-Out still empty —
-  // they must be completed before the file is uploaded to the HR system.
   const incomplete = useMemo(() => {
     const inKey = columns.find((c) => c.mapping.kind === "in_time" || c.role === "in_time")?.key;
     const outKey = columns.find((c) => c.mapping.kind === "out_time" || c.role === "out_time")?.key;
@@ -210,8 +202,6 @@ export function ConversionReview({
     return { rows, missingIn, missingOut };
   }, [exportRows, columns]);
 
-  // Which rules actually fired, so the filter offers exactly the shifts this
-  // template produced (Day shift, Overnight shift, …) rather than a fixed list.
   const ruleCounts = useMemo(() => {
     const m = new Map<string, number>();
     for (const r of downloadRows) {
@@ -299,7 +289,6 @@ export function ConversionReview({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Search by employee ID */}
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -321,7 +310,6 @@ export function ConversionReview({
               )}
             </div>
 
-            {/* Filter by the rule that decided the row (Day shift, Overnight shift, …) */}
             {ruleCounts.length > 1 && (
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-xs uppercase tracking-wide text-muted-foreground">Shift rule</span>

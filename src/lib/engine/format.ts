@@ -38,11 +38,6 @@ function pad(n: number, len = 2): string {
   return String(n).padStart(len, "0");
 }
 
-/**
- * A missing OR blank format pattern falls back to the default. A saved template
- * can legitimately hold "" (the format field was cleared), and an empty pattern
- * would otherwise format every value as an empty string.
- */
 function patternOr(format: string | undefined, fallback: string): string {
   const f = (format ?? "").trim();
   return f === "" ? fallback : f;

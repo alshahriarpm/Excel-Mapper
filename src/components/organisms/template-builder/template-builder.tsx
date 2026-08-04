@@ -390,11 +390,6 @@ function StepTarget({
   );
 }
 
-/**
- * Format-pattern field. The text is local so it can be cleared and retyped
- * freely, but an empty pattern is never saved — a blank format would render
- * every date/time as an empty cell. Clearing it restores the default.
- */
 function FormatInput({
   value,
   fallback,

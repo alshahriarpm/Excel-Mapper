@@ -17,12 +17,6 @@ function splitPasted(text: string): string[] {
     .filter(Boolean);
 }
 
-/**
- * Collects the ID list a template's "is in the list HR uploads" condition needs
- * — by spreadsheet upload or by pasting. On upload the ID column is detected
- * (and can be switched), so a roster with name/shift/date columns still yields
- * only employee IDs.
- */
 export function UploadedListInput({
   values,
   onChange,
@@ -39,7 +33,6 @@ export function UploadedListInput({
   const [pasted, setPasted] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  // Parsed upload kept so the ID column can be switched without re-reading.
   const [sheetRows, setSheetRows] = useState<Record<string, CellValue>[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [idColumn, setIdColumn] = useState("");

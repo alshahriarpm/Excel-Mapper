@@ -59,8 +59,11 @@ export async function listTemplates(): Promise<SavedConversionTemplate[]> {
   return rows.map((r) => rowToTemplate(toTemplateRow(r)));
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function getTemplateById(id: string): Promise<SavedConversionTemplate | null> {
   if (DEMO) return demoStore.getTemplate(id);
+  if (!UUID_RE.test(id)) return null;
   const row = await prisma.templates.findUnique({ where: { id } });
   return row ? rowToTemplate(toTemplateRow(row)) : null;
 }

@@ -309,12 +309,10 @@ describe("Related-date processing (spec §21)", () => {
 });
 
 describe('The "Blank" condition token', () => {
-  // The day rule as configured for Singer: On Desc equals Absent / Arrive late / Blank.
   const dayOnly = () =>
     regularRule({ order: 0, conditions: [{ sourceColumn: "On Desc", operator: "equals", values: ["Absent", "Arrive late", "Blank"] }] });
 
   it("matches a blank cell — a clocked-in row whose punch-out never registered still converts", () => {
-    // Off Desc carries "Not Swipe"; On Desc is blank. The rule reads On Desc.
     const res = convert(
       [row({ UserID: "SS812", Date: "27/07/2026", "On Desc": "", "A M OnDuty": "06:36:45", "P M OffDuty": "" })],
       { rules: [dayOnly()] },
@@ -346,7 +344,6 @@ describe('The "Blank" condition token', () => {
 });
 
 describe("Overnight shift by uploaded employee-ID list", () => {
-  // Roster rule first so it wins for listed employees, day rule second.
   const rosterRule = () =>
     overnightRule({
       name: "Overnight roster",
@@ -365,9 +362,9 @@ describe("Overnight shift by uploaded employee-ID list", () => {
     const res = convert(twoDays(), { rules: [rosterRule(), dayRule()], uploadedList: ["SS200"] });
     const july14 = res.rows[0]!;
     expect(july14.appliedRuleName).toBe("Overnight roster");
-    expect(val(july14, "in")).toBe("9:00 PM"); // 14 July P M OffDuty
-    expect(val(july14, "out")).toBe("6:30 AM"); // 15 July A M OnDuty
-    expect(val(july14, "date")).toBe("14/07/2026"); // row keeps its own date
+    expect(val(july14, "in")).toBe("9:00 PM");
+    expect(val(july14, "out")).toBe("6:30 AM");
+    expect(val(july14, "date")).toBe("14/07/2026");
     expect(july14.status).toBe("ready");
   });
 
@@ -398,7 +395,7 @@ describe("Overnight shift by uploaded employee-ID list", () => {
   it("without a list the roster rule matches nobody and the day rule applies", () => {
     const res = convert(twoDays(), { rules: [rosterRule(), dayRule()] });
     expect(res.rows.every((r) => r.appliedRuleName !== "Overnight roster")).toBe(true);
-    expect(val(res.rows[0]!, "in")).toBe("8:00 PM"); // day logic: A M OnDuty
+    expect(val(res.rows[0]!, "in")).toBe("8:00 PM");
   });
 
   it("no next-day record keeps Check-In and flags the row for review", () => {

@@ -57,14 +57,6 @@ export function rowsForOutput(
   });
 }
 
-/**
- * A template's scaffolding is a handful of rows — an instruction row and a few
- * examples. More filled rows than this below the header means the file is not a
- * blank template but one that already holds records (e.g. a previous export
- * saved over the template), so they are data to be replaced, not a preamble to
- * keep. Guessing wrong the other way would copy stale attendance into every
- * export.
- */
 const MAX_PREAMBLE_ROWS = 10;
 
 function preambleRowCount(

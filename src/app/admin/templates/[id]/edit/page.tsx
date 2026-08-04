@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth";
 import { getTemplateById } from "@/lib/actions/templates";
 import { listCompanies } from "@/lib/actions/companies";
@@ -16,7 +16,7 @@ export default async function EditTemplatePage({ params }: { params: Promise<{ i
     getTemplateById(id),
     listCompanies().then((cs) => cs.map((c) => ({ id: c.id, name: c.name }))),
   ]);
-  if (!template) redirect("/admin/templates");
+  if (!template) notFound();
 
   return (
     <>

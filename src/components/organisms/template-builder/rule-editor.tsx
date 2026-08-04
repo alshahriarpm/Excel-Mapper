@@ -29,12 +29,6 @@ const OPERATOR_LABELS: Record<ConditionOperator, string> = {
 
 const USES_UPLOADED_LIST: ConditionOperator[] = ["in_uploaded_list", "not_in_uploaded_list"];
 
-/**
- * Comma-separated condition values. The text you type is held locally and is
- * never re-derived from the saved values, so splitting/trimming for storage
- * can't rewrite the field mid-edit (typing a space or backspacing used to fight
- * the round-trip). Stored values stay trimmed.
- */
 function ConditionValuesInput({
   initialValues,
   onChange,
@@ -91,8 +85,6 @@ export function RuleEditor({
     const conditions = rule.conditions.map((c, ci) => {
       if (ci !== i) return c;
       const next = { ...c, ...patch };
-      // Operators that take no typed values hide the values box, so anything
-      // left there is stale and must not be carried along.
       if (patch.operator && !NEEDS_VALUES.includes(next.operator)) next.values = [];
       return next;
     });

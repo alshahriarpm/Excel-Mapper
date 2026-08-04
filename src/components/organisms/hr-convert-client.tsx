@@ -16,7 +16,6 @@ import type { SavedConversionTemplate, SourceRow } from "@/lib/engine/types";
 
 type Phase = "upload" | "parsing" | "review" | "error";
 
-/** True when any rule matches on the ID list HR supplies at conversion time. */
 function usesUploadedList(template: SavedConversionTemplate): boolean {
   return template.rules.some((r) =>
     r.conditions.some(

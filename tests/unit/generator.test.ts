@@ -225,8 +225,6 @@ describe("Snapshot round-trip (preserving original formatting)", () => {
   });
 
   it("replaces the data of a target that already holds records instead of keeping it as a preamble", async () => {
-    // A previous export saved over the blank template: header, instruction, 3
-    // examples, then many real records. None of the records may survive.
     const original = new ExcelJS.Workbook();
     const ws = original.addWorksheet("Attendance");
     ws.getRow(1).values = ["Employee ID*", "Date*", "In Time*", "Out Time*"];
@@ -248,7 +246,6 @@ describe("Snapshot round-trip (preserving original formatting)", () => {
     });
     const out = (await readBack(file.data)).getWorksheet("Attendance")!;
 
-    // Converted data starts immediately below the header; nothing stale remains.
     expect(String(out.getRow(2).getCell(1).value)).toBe("00125");
     const ids: string[] = [];
     for (let r = 2; r <= out.actualRowCount; r++) {

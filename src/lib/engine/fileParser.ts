@@ -78,11 +78,6 @@ function extractCellValue(raw: ExcelJS.CellValue): CellValue {
 const TIME_RE = /^\d{1,2}:\d{2}(:\d{2})?(\s*[AaPp][Mm])?$/;
 const DATE_RE = /^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}/;
 
-/**
- * Date pattern of an unformatted date string, so a column holding "2026-07-19"
- * is reported as YYYY-MM-DD rather than being assumed day-first. Only the
- * year's position is inferable; a leading 1-2 digit field stays day-first.
- */
 function guessDateFormat(value: string): string {
   const s = value.trim();
   const sep = s.match(/^\d{1,4}([-/.])/)?.[1] ?? "-";
@@ -103,8 +98,6 @@ function detectType(value: CellValue, numFmt?: string): { type: TargetColumnType
     if (/[0#]/.test(f) && !/@/.test(f)) return { type: "number", format: { numberFormat: numFmt } };
     if (f === "@") return { type: "text", format: { preserveLeadingZeros: true } };
   }
-  // A real date cell with no number format carries no display hint; ISO is the
-  // unambiguous default.
   if (value instanceof Date) return { type: "date", format: { dateFormat: "YYYY-MM-DD" } };
   if (typeof value === "number") return { type: "number" };
   if (typeof value === "string") {
