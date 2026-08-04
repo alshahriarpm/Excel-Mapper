@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { ListChecks, Loader2, X } from "lucide-react";
 import { Button } from "@/components/atoms/ui/button";
 import { Textarea } from "@/components/atoms/ui/textarea";
@@ -17,17 +17,10 @@ function splitPasted(text: string): string[] {
     .filter(Boolean);
 }
 
-export function UploadedListInput({
-  values,
-  onChange,
-  label = "Overnight shift employee IDs",
-  description = "Upload a file with one employee ID per row, or paste the IDs below.",
-}: {
-  values: string[];
-  onChange: (values: string[]) => void;
-  label?: string;
-  description?: string;
-}) {
+export type UploadedList = ReturnType<typeof useUploadedList>;
+
+export function useUploadedList() {
+  const [values, setValues] = useState<string[]>([]);
   const [mode, setMode] = useState<"upload" | "paste">("upload");
   const [fileName, setFileName] = useState<string | null>(null);
   const [pasted, setPasted] = useState("");
@@ -37,7 +30,7 @@ export function UploadedListInput({
   const [headers, setHeaders] = useState<string[]>([]);
   const [idColumn, setIdColumn] = useState("");
 
-  async function onFile(file: File) {
+  const onFile = useCallback(async (file: File) => {
     setBusy(true);
     setError("");
     try {
@@ -52,33 +45,78 @@ export function UploadedListInput({
       setHeaders(cols);
       setIdColumn(chosen);
       setFileName(parsed.fileName);
-      onChange(ids);
+      setValues(ids);
     } catch (e) {
       setError(e instanceof Error ? e.message : "We couldn't read that file.");
     } finally {
       setBusy(false);
     }
-  }
+  }, []);
 
-  function useColumn(header: string) {
-    setIdColumn(header);
-    onChange(columnValues(sheetRows, header));
-  }
+  const chooseColumn = useCallback(
+    (header: string) => {
+      setIdColumn(header);
+      setValues(columnValues(sheetRows, header));
+    },
+    [sheetRows],
+  );
 
-  function applyPasted(text: string) {
+  const applyPasted = useCallback((text: string) => {
     setPasted(text);
-    onChange(Array.from(new Set(splitPasted(text))));
-  }
+    setValues(Array.from(new Set(splitPasted(text))));
+  }, []);
 
-  function clearAll() {
+  const clear = useCallback(() => {
     setFileName(null);
     setPasted("");
     setError("");
     setSheetRows([]);
     setHeaders([]);
     setIdColumn("");
-    onChange([]);
-  }
+    setValues([]);
+  }, []);
+
+  return {
+    values,
+    mode,
+    setMode,
+    fileName,
+    pasted,
+    busy,
+    error,
+    headers,
+    idColumn,
+    onFile,
+    chooseColumn,
+    applyPasted,
+    clear,
+  };
+}
+
+export function UploadedListInput({
+  list,
+  label = "Overnight shift employee IDs",
+  description = "Upload a file with one employee ID per row, or paste the IDs below.",
+}: {
+  list: UploadedList;
+  label?: string;
+  description?: string;
+}) {
+  const {
+    values,
+    mode,
+    setMode,
+    fileName,
+    pasted,
+    busy,
+    error,
+    headers,
+    idColumn,
+    onFile,
+    chooseColumn,
+    applyPasted,
+    clear: clearAll,
+  } = list;
 
   return (
     <div className="space-y-3 rounded-xl border border-border p-4">
@@ -138,7 +176,7 @@ export function UploadedListInput({
       {mode === "upload" && headers.length > 1 && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-muted-foreground">ID column</span>
-          <Select value={idColumn} onValueChange={useColumn}>
+          <Select value={idColumn} onValueChange={chooseColumn}>
             <SelectTrigger className="h-9 w-auto min-w-[160px]">
               <SelectValue placeholder="column" />
             </SelectTrigger>

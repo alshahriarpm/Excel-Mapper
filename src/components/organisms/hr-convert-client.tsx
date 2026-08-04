@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, ArrowLeft } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/atoms/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/atoms/ui/card";
 import { FileDropzone } from "@/components/molecules/file-dropzone";
 import { LoadingProgress } from "@/components/molecules/loading-progress";
-import { UploadedListInput } from "@/components/molecules/uploaded-list-input";
+import { UploadedListInput, useUploadedList } from "@/components/molecules/uploaded-list-input";
 import { ConversionReview } from "@/components/organisms/conversion-review";
 import { parseWorkbook, sheetToSourceRows, ParseError } from "@/lib/engine/fileParser";
 import { normalizeHeader } from "@/lib/engine/normalize";
@@ -38,7 +38,7 @@ export function HrConvertClient({
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
   const [missingColumns, setMissingColumns] = useState<string[]>([]);
-  const [uploadedList, setUploadedList] = useState<string[]>([]);
+  const overnight = useUploadedList();
   const needsList = usesUploadedList(template);
 
   async function handleFile(file: File) {
@@ -59,7 +59,7 @@ export function HrConvertClient({
 
       setRows(sheetToSourceRows(sheet));
       setFileName(file.name);
-      setPhase("review");
+      setPhase("upload");
     } catch (e) {
       setError(
         e instanceof ParseError
@@ -76,7 +76,7 @@ export function HrConvertClient({
     setFileName("");
     setError("");
     setMissingColumns([]);
-    setUploadedList([]);
+    overnight.clear();
   }
 
   return (
@@ -98,15 +98,17 @@ export function HrConvertClient({
             <CardTitle className="text-base">Upload the file that contains your data</CardTitle>
           </CardHeader>
           <CardContent>
-            <FileDropzone onFile={handleFile} />
+            <FileDropzone onFile={handleFile} fileName={fileName || null} />
             <p className="mt-3 text-xs text-muted-foreground">
-              Your file is processed entirely in your browser — it never leaves your computer.
+              {rows.length > 0
+                ? `${rows.length} rows read. Your file is processed entirely in your browser — it never leaves your computer.`
+                : "Your file is processed entirely in your browser — it never leaves your computer."}
             </p>
             {needsList && (
               <div className="mt-4">
-                <UploadedListInput values={uploadedList} onChange={setUploadedList} />
+                <UploadedListInput list={overnight} />
                 <p className="mt-2 text-xs text-muted-foreground">
-                  You can also add or change this after uploading your attendance file.
+                  Leave this empty if nobody in this file worked an overnight shift.
                 </p>
               </div>
             )}
@@ -127,6 +129,17 @@ export function HrConvertClient({
                 <span className="text-xs text-muted-foreground">No file handy? Preview with a built-in sample.</span>
               </div>
             )}
+
+            <div className="mt-6 flex items-center justify-between gap-3 border-t border-border pt-5">
+              <Button variant="ghost" asChild>
+                <Link href="/hr">
+                  <ArrowLeft className="h-4 w-4" /> Back
+                </Link>
+              </Button>
+              <Button onClick={() => setPhase("review")} disabled={rows.length === 0}>
+                Continue <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -174,36 +187,52 @@ export function HrConvertClient({
               </div>
             </div>
           )}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
               Converted <span className="font-medium text-foreground">{rows.length}</span> rows from{" "}
-              <span className="font-medium text-foreground">{fileName}</span>.
-            </p>
-            <Button variant="ghost" size="sm" onClick={reset}>
-              Start over
-            </Button>
-          </div>
-          {needsList && (
-            <>
-              <UploadedListInput values={uploadedList} onChange={setUploadedList} />
-              {uploadedList.length === 0 && (
-                <div className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4">
-                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning-foreground" />
-                  <div className="text-sm">
-                    <p className="font-medium">No overnight IDs added yet.</p>
-                    <p className="text-muted-foreground">
-                      This template has a rule for employees whose shift runs overnight. Until you add
-                      their IDs above, those employees are treated as a normal day shift.
-                    </p>
-                  </div>
-                </div>
+              <span className="font-medium text-foreground">{fileName}</span>
+              {needsList && overnight.values.length > 0 && (
+                <>
+                  , with{" "}
+                  <span className="font-medium text-foreground">
+                    {overnight.values.length} overnight ID{overnight.values.length === 1 ? "" : "s"}
+                  </span>
+                </>
               )}
-            </>
+              .
+            </p>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="sm" onClick={() => setPhase("upload")}>
+                <ArrowLeft className="h-4 w-4" /> Back
+              </Button>
+              <Button variant="ghost" size="sm" onClick={reset}>
+                Start over
+              </Button>
+            </div>
+          </div>
+          {needsList && overnight.values.length === 0 && (
+            <div className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning-foreground" />
+              <div className="text-sm">
+                <p className="font-medium">No overnight IDs added yet.</p>
+                <p className="text-muted-foreground">
+                  This template has a rule for employees whose shift runs overnight. Go{" "}
+                  <button
+                    type="button"
+                    onClick={() => setPhase("upload")}
+                    className="font-medium text-foreground underline underline-offset-2"
+                  >
+                    back
+                  </button>{" "}
+                  to add their IDs, or those employees are treated as a normal day shift.
+                </p>
+              </div>
+            </div>
           )}
           <ConversionReview
             template={template}
             sourceRows={rows}
-            uploadedList={uploadedList}
+            uploadedList={overnight.values}
             onDownloaded={(_mode, summary) =>
               void logConversion({
                 templateId: template.id,
