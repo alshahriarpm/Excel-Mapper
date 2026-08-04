@@ -44,8 +44,8 @@
 
     --radius: 0.75rem;
 
-    --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-    --font-mono: "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --font-sans: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
 
   .dark {
@@ -91,12 +91,9 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "cv11", "ss01";
-    -webkit-font-smoothing: antialiased;
-  }
-  .font-mono {
     font-feature-settings: normal;
     font-variant-ligatures: none;
+    -webkit-font-smoothing: antialiased;
   }
 }
 
