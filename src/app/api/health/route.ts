@@ -37,7 +37,14 @@ function dbProjectRef(): string | null {
   return process.env.SUPABASE_PROJECT_REF ?? null;
 }
 
-export async function GET() {
+function diagnosticsAllowed(request: Request): boolean {
+  if (process.env.NODE_ENV !== "production") return true;
+  const token = process.env.HEALTH_DIAG_TOKEN;
+  if (!token) return false;
+  return new URL(request.url).searchParams.get("token") === token;
+}
+
+export async function GET(request: Request) {
   const configured = {
     DATABASE_URL: Boolean(process.env.DATABASE_URL),
     SUPABASE_PROJECT_REF: Boolean(process.env.SUPABASE_PROJECT_REF),
@@ -105,7 +112,16 @@ export async function GET() {
 
   const ok = database === "ok" && profilesTable === "ok";
   return NextResponse.json(
-    { ok, database, profilesTable, hasAnyProfiles, project, session, error, configured },
+    {
+      ok,
+      database,
+      profilesTable,
+      hasAnyProfiles,
+      project,
+      session,
+      error,
+      ...(diagnosticsAllowed(request) ? { configured } : {}),
+    },
     { status: ok ? 200 : 503 },
   );
 }

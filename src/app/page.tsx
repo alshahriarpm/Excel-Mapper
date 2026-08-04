@@ -4,8 +4,8 @@ import { getSessionOutcome } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const { session, reason } = await getSessionOutcome();
-  if (!session) redirect(`/login?next=%2F&reason=${reason}`);
+  const { session } = await getSessionOutcome();
+  if (!session) redirect("/login?next=%2F");
 
   const role = session.profile?.role;
   if (role === "super_admin") redirect("/admin");
