@@ -30,6 +30,7 @@ import type {
   RowStatus,
   SavedConversionTemplate,
   SourceRow,
+  TargetColumnConfiguration,
 } from "@/lib/engine/types";
 
 type Filter = "all" | RowStatus;
@@ -38,6 +39,12 @@ const NUMERIC_PREFIX = "#";
 const NO_ID_PREFIX = "(no ID)";
 const NO_RULE = "No matching rule";
 const NO_DATE = "(no date)";
+
+const ALIGNED_TYPES = new Set(["date", "time", "datetime", "number"]);
+
+function isAlignedColumn(column: TargetColumnConfiguration, employeeKey?: string): boolean {
+  return ALIGNED_TYPES.has(column.detectedType) || column.key === employeeKey;
+}
 
 export function ConversionReview({
   template,
@@ -366,7 +373,11 @@ export function ConversionReview({
                       {columns.map((c) => {
                         const cell = row.cells[c.key];
                         return (
-                          <td key={c.key} className="px-3 py-2" title={cell?.provenance.description}>
+                          <td
+                            key={c.key}
+                            className={cn("px-3 py-2", isAlignedColumn(c, empKey) && "tabular-nums")}
+                            title={cell?.provenance.description}
+                          >
                             {formatCellForDisplay(cell?.value ?? null, c) || (
                               <span className="text-muted-foreground/50">—</span>
                             )}

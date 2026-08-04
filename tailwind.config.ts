@@ -69,6 +69,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       boxShadow: {
         soft: "0 1px 2px 0 rgb(0 0 0 / 0.03), 0 8px 24px -4px rgb(0 0 0 / 0.08)",
