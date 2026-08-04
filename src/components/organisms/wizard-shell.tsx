@@ -34,7 +34,7 @@ export function WizardShell({
   return (
     <div className="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8">
       <div className="flex max-h-[calc(100dvh-8rem)] min-h-[540px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-soft lg:flex-row">
-        <aside className="hidden shrink-0 flex-col overflow-y-auto border-r border-border bg-secondary/30 p-6 lg:flex lg:w-[300px]">
+        <aside className="hidden shrink-0 flex-col overflow-y-auto border-r border-border bg-secondary/30 px-6 pt-6 lg:flex lg:w-[300px]">
           <div className="mb-8">
             <p className="text-sm font-semibold">New conversion template</p>
             <p className="mt-0.5 text-xs text-muted-foreground">Set it up once, reuse it forever.</p>
@@ -101,7 +101,7 @@ export function WizardShell({
             })}
           </ol>
 
-          <div className="mt-6 border-t border-border pt-4 text-xs font-medium text-muted-foreground">
+          <div className="mt-6 flex min-h-[4.5rem] items-center border-t border-border text-xs font-medium text-muted-foreground">
             Step {current + 1} of {steps.length}
           </div>
         </aside>
@@ -139,7 +139,7 @@ export function WizardShell({
           </div>
 
           {footer && (
-            <div className="flex items-center justify-between gap-3 border-t border-border p-4 sm:px-8">
+            <div className="flex min-h-[4.5rem] items-center justify-between gap-3 border-t border-border px-4 py-3 sm:px-8">
               {footer}
             </div>
           )}
