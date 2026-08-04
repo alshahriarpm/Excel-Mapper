@@ -1,10 +1,28 @@
 import "server-only";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { prisma } from "@/lib/db";
 import { validatePassword } from "@/lib/password";
 
 let attempted = false;
+
+const USERS_PER_PAGE = 200;
+const MAX_USER_PAGES = 25;
+
+async function findAuthUserId(
+  admin: SupabaseClient<Database>,
+  email: string,
+): Promise<string | null> {
+  const wanted = email.toLowerCase();
+  for (let page = 1; page <= MAX_USER_PAGES; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: USERS_PER_PAGE });
+    if (error || !data.users.length) return null;
+    const match = data.users.find((u) => u.email?.toLowerCase() === wanted);
+    if (match) return match.id;
+    if (data.users.length < USERS_PER_PAGE) return null;
+  }
+  return null;
+}
 
 export async function seedAdminFromEnv(): Promise<void> {
   const demoActive =
@@ -57,15 +75,15 @@ export async function seedAdminFromEnv(): Promise<void> {
         where: { email },
         select: { id: true },
       });
-      if (!existing) {
+      userId = existing?.id ?? (await findAuthUserId(admin, email)) ?? undefined;
+      if (!userId) {
         console.warn(
           `[seed] could not create or find admin "${email}": ${error.message}`,
         );
         return;
       }
-      userId = existing.id;
       console.log(
-        `[seed] admin "${email}" already exists — ensuring super_admin role.`,
+        `[seed] admin "${email}" already exists — ensuring profile row and super_admin role.`,
       );
     } else {
       userId = created.user?.id;
