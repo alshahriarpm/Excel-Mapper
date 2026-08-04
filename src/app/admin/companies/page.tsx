@@ -5,6 +5,8 @@ import { TopBar } from "@/components/organisms/top-bar";
 import { CompaniesClient } from "@/components/organisms/companies-client";
 import { BackButton } from "@/components/molecules/back-button";
 
+export const dynamic = "force-dynamic";
+
 export default async function CompaniesPage() {
   const session = await getSessionProfile();
   if (!session) redirect("/login");

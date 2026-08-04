@@ -10,6 +10,8 @@ import { EmptyState } from "@/components/molecules/empty-state";
 import { BackButton } from "@/components/molecules/back-button";
 import { Button } from "@/components/atoms/ui/button";
 
+export const dynamic = "force-dynamic";
+
 export default async function TemplatesPage() {
   const session = await getSessionProfile();
   if (!session) redirect("/login");

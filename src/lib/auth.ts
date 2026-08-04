@@ -6,30 +6,61 @@ import { DEMO, DEMO_ROLE_COOKIE, DEMO_EMAIL_COOKIE, demoSessionForRole } from "@
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
-export async function getSessionProfile(): Promise<{
+export type SessionProfile = {
   userId: string;
   email: string | null;
   profile: Profile | null;
-} | null> {
+};
+
+export type SessionReason =
+  | "ok"
+  | "demo-no-role"
+  | "no-user"
+  | "profile-error"
+  | "blocked"
+  | "company-error";
+
+export async function getSessionProfile(): Promise<SessionProfile | null> {
+  return (await getSessionOutcome()).session;
+}
+
+async function findProfile(userId: string) {
+  try {
+    return await prisma.profiles.findUnique({ where: { id: userId } });
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    return await prisma.profiles.findUnique({ where: { id: userId } });
+  }
+}
+
+export async function getSessionOutcome(): Promise<{
+  session: SessionProfile | null;
+  reason: SessionReason;
+}> {
   if (DEMO) {
     const cookieStore = await cookies();
-    return demoSessionForRole(
+    const demo = demoSessionForRole(
       cookieStore.get(DEMO_ROLE_COOKIE)?.value,
       cookieStore.get(DEMO_EMAIL_COOKIE)?.value,
     );
+    return { session: demo, reason: demo ? "ok" : "demo-no-role" };
   }
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user) {
+    if (userError && userError.name !== "AuthSessionMissingError") {
+      console.error("[auth] getUser failed:", userError.name, userError.message);
+    }
+    return { session: null, reason: "no-user" };
+  }
 
   let row: Awaited<ReturnType<typeof prisma.profiles.findUnique>>;
   try {
-    row = await prisma.profiles.findUnique({ where: { id: user.id } });
+    row = await findProfile(user.id);
   } catch (e) {
     console.error("[auth] profile lookup failed:", e instanceof Error ? e.message : e);
-    return null;
+    return { session: null, reason: "profile-error" };
   }
 
   const profile: Profile | null = row
@@ -44,7 +75,7 @@ export async function getSessionProfile(): Promise<{
       }
     : null;
 
-  if (profile?.blocked) return null;
+  if (profile?.blocked) return { session: null, reason: "blocked" };
 
   if (profile && profile.role !== "super_admin" && profile.company_id) {
     try {
@@ -52,12 +83,15 @@ export async function getSessionProfile(): Promise<{
         where: { id: profile.company_id },
         select: { blocked: true },
       });
-      if (company?.blocked) return null;
+      if (company?.blocked) return { session: null, reason: "blocked" };
     } catch (e) {
       console.error("[auth] company lookup failed:", e instanceof Error ? e.message : e);
-      return null;
+      return { session: null, reason: "company-error" };
     }
   }
 
-  return { userId: user.id, email: user.email ?? null, profile };
+  return {
+    session: { userId: user.id, email: user.email ?? null, profile },
+    reason: "ok",
+  };
 }

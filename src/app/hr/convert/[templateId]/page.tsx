@@ -5,6 +5,8 @@ import { getTemplateById } from "@/lib/actions/templates";
 import { TopBar } from "@/components/organisms/top-bar";
 import { HrConvertClient } from "@/components/organisms/hr-convert-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function HrConvertPage({
   params,
 }: {

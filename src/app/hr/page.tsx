@@ -7,6 +7,8 @@ import { TopBar } from "@/components/organisms/top-bar";
 import { EmptyState } from "@/components/molecules/empty-state";
 import { Card, CardContent } from "@/components/atoms/ui/card";
 
+export const dynamic = "force-dynamic";
+
 export default async function HrHome() {
   const session = await getSessionProfile();
   if (!session) redirect("/login");

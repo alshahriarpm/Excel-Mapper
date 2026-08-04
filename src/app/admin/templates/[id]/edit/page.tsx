@@ -6,6 +6,8 @@ import { TopBar } from "@/components/organisms/top-bar";
 import { TemplateBuilder } from "@/components/organisms/template-builder/template-builder";
 import { BackButton } from "@/components/molecules/back-button";
 
+export const dynamic = "force-dynamic";
+
 export default async function EditTemplatePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await getSessionProfile();

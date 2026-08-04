@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
-import { getSessionProfile } from "@/lib/auth";
+import { getSessionOutcome } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const session = await getSessionProfile();
-  if (!session) redirect("/login?next=%2F&reason=root-nosession");
+  const { session, reason } = await getSessionOutcome();
+  if (!session) redirect(`/login?next=%2F&reason=${reason}`);
 
   const role = session.profile?.role;
   if (role === "super_admin") redirect("/admin");
