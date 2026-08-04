@@ -218,3 +218,14 @@ alter table public.profiles
 alter table public.companies
   add column if not exists blocked boolean not null default false;
 
+
+-- ===== supabase/migrations/0004_theme_preference.sql =====
+-- ===========================================================================
+-- Remember each user's colour scheme so it follows them between devices. The
+-- rendered theme still comes from a cookie so the first paint is correct; this
+-- column is the durable copy the cookie is seeded from.
+-- ===========================================================================
+
+alter table public.profiles
+  add column if not exists theme text not null default 'system'
+  check (theme in ('light', 'dark', 'system'));
