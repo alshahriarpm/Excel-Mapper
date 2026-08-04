@@ -24,7 +24,14 @@ export async function getSessionProfile(): Promise<{
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const row = await prisma.profiles.findUnique({ where: { id: user.id } });
+  let row: Awaited<ReturnType<typeof prisma.profiles.findUnique>>;
+  try {
+    row = await prisma.profiles.findUnique({ where: { id: user.id } });
+  } catch (e) {
+    console.error("[auth] profile lookup failed:", e instanceof Error ? e.message : e);
+    return null;
+  }
+
   const profile: Profile | null = row
     ? {
         id: row.id,
@@ -40,11 +47,16 @@ export async function getSessionProfile(): Promise<{
   if (profile?.blocked) return null;
 
   if (profile && profile.role !== "super_admin" && profile.company_id) {
-    const company = await prisma.companies.findUnique({
-      where: { id: profile.company_id },
-      select: { blocked: true },
-    });
-    if (company?.blocked) return null;
+    try {
+      const company = await prisma.companies.findUnique({
+        where: { id: profile.company_id },
+        select: { blocked: true },
+      });
+      if (company?.blocked) return null;
+    } catch (e) {
+      console.error("[auth] company lookup failed:", e instanceof Error ? e.message : e);
+      return null;
+    }
   }
 
   return { userId: user.id, email: user.email ?? null, profile };

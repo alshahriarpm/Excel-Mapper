@@ -3,7 +3,7 @@ import { getSessionProfile } from "@/lib/auth";
 
 export default async function HomePage() {
   const session = await getSessionProfile();
-  if (!session) redirect("/login");
+  if (!session) redirect("/login?next=%2F");
 
   const role = session.profile?.role;
   if (role === "super_admin") redirect("/admin");

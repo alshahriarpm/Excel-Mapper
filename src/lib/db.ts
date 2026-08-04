@@ -20,7 +20,20 @@ function connectionUrl(): string {
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-export const prisma =
-  globalForPrisma.prisma ?? new PrismaClient({ datasourceUrl: connectionUrl() });
+let client: PrismaClient | undefined;
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+function getClient(): PrismaClient {
+  if (!client) {
+    client = globalForPrisma.prisma ?? new PrismaClient({ datasourceUrl: connectionUrl() });
+    if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = client;
+  }
+  return client;
+}
+
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, property) {
+    const instance = getClient();
+    const value = Reflect.get(instance, property);
+    return typeof value === "function" ? value.bind(instance) : value;
+  },
+});

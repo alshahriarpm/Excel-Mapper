@@ -11,6 +11,10 @@ function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`) || pathname.startsWith(p));
 }
 
+function wantsLoginForm(request: NextRequest): boolean {
+  return request.nextUrl.pathname === "/login" && request.nextUrl.searchParams.has("next");
+}
+
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
   let response = NextResponse.next({ request });
   const { pathname } = request.nextUrl;
@@ -22,7 +26,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
       url.pathname = "/login";
       return NextResponse.redirect(url);
     }
-    if (hasRole && pathname === "/login") {
+    if (hasRole && pathname === "/login" && !wantsLoginForm(request)) {
       const url = request.nextUrl.clone();
       url.pathname = "/";
       return NextResponse.redirect(url);
@@ -64,7 +68,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     return NextResponse.redirect(url);
   }
 
-  if (user && pathname === "/login") {
+  if (user && pathname === "/login" && !wantsLoginForm(request)) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
