@@ -26,7 +26,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <ThemeScript theme={theme} />
       </head>
-      <body className={`${firaCode.variable} font-mono antialiased`}>
+      <body className={`${firaCode.variable} font-mono antialiased`} suppressHydrationWarning>
         {children}
         <Toaster richColors closeButton position="top-center" theme={theme} />
       </body>
