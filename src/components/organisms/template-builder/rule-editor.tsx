@@ -88,7 +88,14 @@ export function RuleEditor({
   onMove: (dir: -1 | 1) => void;
 }) {
   function updateCondition(i: number, patch: Partial<ConversionCondition>) {
-    const conditions = rule.conditions.map((c, ci) => (ci === i ? { ...c, ...patch } : c));
+    const conditions = rule.conditions.map((c, ci) => {
+      if (ci !== i) return c;
+      const next = { ...c, ...patch };
+      // Operators that take no typed values hide the values box, so anything
+      // left there is stale and must not be carried along.
+      if (patch.operator && !NEEDS_VALUES.includes(next.operator)) next.values = [];
+      return next;
+    });
     onChange({ ...rule, conditions });
   }
 

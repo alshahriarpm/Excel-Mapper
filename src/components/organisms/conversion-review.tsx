@@ -44,12 +44,15 @@ export function ConversionReview({
   sourceRows,
   fileNameOverride,
   uploadedList,
+  allowDownload = true,
   onDownloaded,
 }: {
   template: SavedConversionTemplate;
   sourceRows: SourceRow[];
   fileNameOverride?: string;
   uploadedList?: string[];
+  /** Producing the file is HR's step; the builder only previews the result. */
+  allowDownload?: boolean;
   onDownloaded?: (mode: OutputExportMode, summary: ConversionResult["summary"]) => void;
 }) {
   const result = useMemo(
@@ -520,7 +523,7 @@ export function ConversionReview({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Download</CardTitle>
+          <CardTitle className="text-base">{allowDownload ? "Download" : "What HR will get"}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-4">
@@ -541,17 +544,24 @@ export function ConversionReview({
               <dd className="font-medium">{includeCount} of {s.total}</dd>
             </div>
           </dl>
-          <div className="flex flex-wrap gap-3">
-            <Button
-              onClick={() =>
-                incomplete.rows > 0 ? setWarnIncomplete(true) : void download("include_incomplete")
-              }
-              disabled={busy || includeCount === 0}
-              loading={busy}
-            >
-              <Download className="h-4 w-4" /> Download template ({includeCount})
-            </Button>
-          </div>
+          {allowDownload ? (
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={() =>
+                  incomplete.rows > 0 ? setWarnIncomplete(true) : void download("include_incomplete")
+                }
+                disabled={busy || includeCount === 0}
+                loading={busy}
+              >
+                <Download className="h-4 w-4" /> Download template ({includeCount})
+              </Button>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              This is a preview of the conversion. HR downloads the file from their own screen once
+              this template is published.
+            </p>
+          )}
           {incomplete.rows > 0 && (
             <div className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning-foreground" />
@@ -580,7 +590,7 @@ export function ConversionReview({
         </CardContent>
       </Card>
 
-      <Dialog open={warnIncomplete} onOpenChange={(o) => !o && !busy && setWarnIncomplete(false)}>
+      <Dialog open={allowDownload && warnIncomplete} onOpenChange={(o) => !o && !busy && setWarnIncomplete(false)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">

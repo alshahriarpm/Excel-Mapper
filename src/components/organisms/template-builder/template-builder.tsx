@@ -683,7 +683,12 @@ function StepReview({ template, rows }: { template: SavedConversionTemplate; row
           description="Your rules use a list HR uploads at conversion time. Add a few IDs here to test that rule now."
         />
       )}
-      <ConversionReview template={template} sourceRows={rows} uploadedList={uploadedList} />
+      <ConversionReview
+        template={template}
+        sourceRows={rows}
+        uploadedList={uploadedList}
+        allowDownload={false}
+      />
     </div>
   );
 }
