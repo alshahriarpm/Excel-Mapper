@@ -12,12 +12,23 @@ const OPTIONS: { value: Theme; label: string; icon: React.ReactNode }[] = [
   { value: "system", label: "System", icon: <Monitor className="h-3.5 w-3.5" /> },
 ];
 
+const TRANSITION_MS = 260;
+let transitionTimer: ReturnType<typeof setTimeout> | undefined;
+
 function applyTheme(theme: Theme) {
+  const root = document.documentElement;
   const dark =
     theme === "dark" ||
     (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  document.documentElement.classList.toggle("dark", dark);
-  document.documentElement.style.colorScheme = dark ? "dark" : "light";
+
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    root.classList.add("theme-transition");
+    clearTimeout(transitionTimer);
+    transitionTimer = setTimeout(() => root.classList.remove("theme-transition"), TRANSITION_MS);
+  }
+
+  root.classList.toggle("dark", dark);
+  root.style.colorScheme = dark ? "dark" : "light";
 }
 
 export function ThemeToggle({ initial }: { initial: Theme }) {

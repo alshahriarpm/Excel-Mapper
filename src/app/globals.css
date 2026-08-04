@@ -97,6 +97,24 @@
   }
 }
 
+/* Only while the user is switching theme, so the surfaces cross-fade instead of
+   snapping. Scoped to the panels that carry the colour rather than every node,
+   and never present on first paint, so a 2900-row table is untouched. */
+.theme-transition,
+.theme-transition body,
+.theme-transition header,
+.theme-transition aside,
+.theme-transition [class~="bg-card"],
+.theme-transition [class~="bg-background"],
+.theme-transition [class~="bg-secondary"],
+.theme-transition [class~="bg-accent"],
+.theme-transition [class~="bg-muted"] {
+  transition:
+    background-color 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease;
+}
+
 /* Respect users who prefer reduced motion (accessibility). */
 @media (prefers-reduced-motion: reduce) {
   *,
