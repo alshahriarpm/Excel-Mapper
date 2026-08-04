@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock, Download, FileWarning, Layers, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Clock, Download, FileWarning, Layers, AlertTriangle, Search, X } from "lucide-react";
 import { Button } from "@/components/atoms/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/atoms/ui/card";
 import { Checkbox } from "@/components/atoms/ui/checkbox";
+import { Input } from "@/components/atoms/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,7 @@ type Filter = "all" | RowStatus;
 
 const NUMERIC_PREFIX = "#";
 const NO_ID_PREFIX = "(no ID)";
+const NO_RULE = "No matching rule";
 
 export function ConversionReview({
   template,
@@ -64,6 +66,8 @@ export function ConversionReview({
   );
 
   const [filter, setFilter] = useState<Filter>("all");
+  const [ruleFilter, setRuleFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [warnIncomplete, setWarnIncomplete] = useState(false);
   const [pageSize, setPageSize] = useState(50);
@@ -149,12 +153,31 @@ export function ConversionReview({
     return { rows, missingIn, missingOut };
   }, [exportRows, columns]);
 
-  const visibleRows = useMemo(() => {
-    if (filter === "all") return downloadRows;
-    return downloadRows.filter((r) => r.status === filter || r.warnings.includes(filter));
-  }, [downloadRows, filter]);
+  // Which rules actually fired, so the filter offers exactly the shifts this
+  // template produced (Day shift, Overnight shift, …) rather than a fixed list.
+  const ruleCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of downloadRows) {
+      const name = r.appliedRuleName ?? NO_RULE;
+      m.set(name, (m.get(name) ?? 0) + 1);
+    }
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [downloadRows]);
 
-  useEffect(() => setPage(1), [filter, pageSize, visibleRows.length]);
+  const visibleRows = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return downloadRows.filter((r) => {
+      if (filter !== "all" && !(r.status === filter || r.warnings.includes(filter))) return false;
+      if (ruleFilter !== "all" && (r.appliedRuleName ?? NO_RULE) !== ruleFilter) return false;
+      if (needle) {
+        const id = empKey ? String(r.cells[empKey]?.value ?? "") : "";
+        if (!id.toLowerCase().includes(needle)) return false;
+      }
+      return true;
+    });
+  }, [downloadRows, filter, ruleFilter, search, empKey]);
+
+  useEffect(() => setPage(1), [filter, ruleFilter, search, pageSize, visibleRows.length]);
   const totalPages = Math.max(1, Math.ceil(visibleRows.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const pageRows = useMemo(
@@ -197,20 +220,87 @@ export function ConversionReview({
       </div>
 
       <Card>
-        <CardHeader className="flex-row items-center justify-between">
-          <CardTitle className="text-base">
-            {filter === "all" ? "All records" : "Filtered records"}{" "}
-            <span className="font-normal text-muted-foreground">({visibleRows.length})</span>
-          </CardTitle>
-          {filter !== "all" && (
-            <Button variant="ghost" size="sm" onClick={() => setFilter("all")}>
-              Clear filter
-            </Button>
-          )}
+        <CardHeader className="space-y-3">
+          <div className="flex flex-row items-center justify-between gap-3">
+            <CardTitle className="text-base">
+              {filter === "all" && ruleFilter === "all" && !search.trim() ? "All records" : "Filtered records"}{" "}
+              <span className="font-normal text-muted-foreground">({visibleRows.length})</span>
+            </CardTitle>
+            {(filter !== "all" || ruleFilter !== "all" || search.trim() !== "") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setFilter("all");
+                  setRuleFilter("all");
+                  setSearch("");
+                }}
+              >
+                Clear filters
+              </Button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Search by employee ID */}
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="h-9 w-56 pl-8"
+                placeholder="Search employee ID…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                disabled={!empKey}
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label="Clear search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Filter by the rule that decided the row (Day shift, Overnight shift, …) */}
+            {ruleCounts.length > 1 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs uppercase tracking-wide text-muted-foreground">Shift rule</span>
+                <Button
+                  variant={ruleFilter === "all" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setRuleFilter("all")}
+                >
+                  All
+                </Button>
+                {ruleCounts.map(([name, count]) => (
+                  <Button
+                    key={name}
+                    variant={ruleFilter === name ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setRuleFilter(ruleFilter === name ? "all" : name)}
+                    title={name}
+                  >
+                    <span className="max-w-[190px] truncate">{name}</span>
+                    <span className="text-muted-foreground">({count})</span>
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {visibleRows.length === 0 ? (
-            <EmptyState title="Nothing here" description="No records match this filter." />
+            <EmptyState
+              title="Nothing here"
+              description={
+                search.trim()
+                  ? `No records with an employee ID containing “${search.trim()}”.`
+                  : "No records match this filter."
+              }
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px] text-sm">
