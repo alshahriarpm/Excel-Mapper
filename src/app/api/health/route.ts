@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -76,9 +77,35 @@ export async function GET() {
     sameProject: authProjectRef() !== null && authProjectRef() === dbProjectRef(),
   };
 
+  const session: Record<string, unknown> = { authenticated: false };
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      session.authenticated = true;
+      session.userIdPrefix = user.id.slice(0, 8);
+      session.jwtMetadataRole = (user.user_metadata as { role?: unknown } | null)?.role ?? null;
+      const { prisma } = await import("@/lib/db");
+      const row = await prisma.profiles.findUnique({
+        where: { id: user.id },
+        select: { role: true, company_id: true, blocked: true },
+      });
+      session.hasProfileRow = Boolean(row);
+      session.profileRole = row?.role ?? null;
+      session.hasCompany = Boolean(row?.company_id);
+      session.blocked = row?.blocked ?? null;
+      session.wouldRedirectTo =
+        row?.role === "super_admin" ? "/admin" : row?.role === "hr" ? "/hr" : "(no role — stays on /)";
+    }
+  } catch (e) {
+    session.error = summarize(e);
+  }
+
   const ok = database === "ok" && profilesTable === "ok";
   return NextResponse.json(
-    { ok, database, profilesTable, hasAnyProfiles, project, error, configured },
+    { ok, database, profilesTable, hasAnyProfiles, project, session, error, configured },
     { status: ok ? 200 : 503 },
   );
 }
