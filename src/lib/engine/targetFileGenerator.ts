@@ -57,13 +57,23 @@ export function rowsForOutput(
   });
 }
 
+/**
+ * A template's scaffolding is a handful of rows — an instruction row and a few
+ * examples. More filled rows than this below the header means the file is not a
+ * blank template but one that already holds records (e.g. a previous export
+ * saved over the template), so they are data to be replaced, not a preamble to
+ * keep. Guessing wrong the other way would copy stale attendance into every
+ * export.
+ */
+const MAX_PREAMBLE_ROWS = 10;
+
 function preambleRowCount(
   worksheet: ExcelJS.Worksheet,
   headerRowNumber: number,
   columns: TargetColumnConfiguration[],
 ): number {
   let count = 0;
-  for (let i = 1; i <= 100; i++) {
+  for (let i = 1; i <= MAX_PREAMBLE_ROWS + 1; i++) {
     const row = worksheet.getRow(headerRowNumber + i);
     const hasValue = columns.some((col) => {
       const v = row.getCell(col.order + 1).value;
@@ -72,7 +82,7 @@ function preambleRowCount(
     if (!hasValue) break;
     count++;
   }
-  return count;
+  return count > MAX_PREAMBLE_ROWS ? 0 : count;
 }
 
 

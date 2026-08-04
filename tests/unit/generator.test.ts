@@ -224,6 +224,40 @@ describe("Snapshot round-trip (preserving original formatting)", () => {
     expect(String(out.getRow(3).getCell(1).value)).toBe("00125");
   });
 
+  it("replaces the data of a target that already holds records instead of keeping it as a preamble", async () => {
+    // A previous export saved over the blank template: header, instruction, 3
+    // examples, then many real records. None of the records may survive.
+    const original = new ExcelJS.Workbook();
+    const ws = original.addWorksheet("Attendance");
+    ws.getRow(1).values = ["Employee ID*", "Date*", "In Time*", "Out Time*"];
+    ws.getRow(2).values = ["Unique employee id", "Attendance date", "HH:MM", "HH:MM"];
+    ws.getRow(3).values = ["EMP001", "2023-01-01", "09:00 AM", "05:00 PM"];
+    for (let r = 4; r < 60; r++) {
+      ws.getRow(r).values = [`STALE${r}`, "01/07/2026", "08:00", "17:00"];
+    }
+    const snapshot = Buffer.from(
+      new Uint8Array((await original.xlsx.writeBuffer()) as ArrayBuffer),
+    ).toString("base64");
+
+    const target = targetConfiguration({ workbookSnapshot: snapshot });
+    const { res } = build(target);
+    const file = await generateTargetFile({
+      targetConfiguration: target,
+      convertedRows: res.rows,
+      outputMode: "all",
+    });
+    const out = (await readBack(file.data)).getWorksheet("Attendance")!;
+
+    // Converted data starts immediately below the header; nothing stale remains.
+    expect(String(out.getRow(2).getCell(1).value)).toBe("00125");
+    const ids: string[] = [];
+    for (let r = 2; r <= out.actualRowCount; r++) {
+      ids.push(String(out.getRow(r).getCell(1).value ?? ""));
+    }
+    expect(ids.some((v) => v.startsWith("STALE"))).toBe(false);
+    expect(ids).not.toContain("EMP001");
+  });
+
   it("removes worksheet protection so the downloaded sheet is editable", async () => {
     const original = new ExcelJS.Workbook();
     const ws = original.addWorksheet("Attendance");
