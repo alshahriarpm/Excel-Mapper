@@ -20,7 +20,7 @@ import { EmptyState } from "@/components/molecules/empty-state";
 import { runConfigurableAttendanceTransform, summarize } from "@/lib/engine/configurableAttendanceTransform";
 import { generateTargetFile, rowsForOutput } from "@/lib/engine/targetFileGenerator";
 import { formatCellForDisplay } from "@/lib/engine/format";
-import { isBlank } from "@/lib/engine/normalize";
+import { isBlank, parseCalendarDate } from "@/lib/engine/normalize";
 import { triggerDownload } from "@/lib/download";
 import { cn } from "@/lib/utils";
 import type {
@@ -37,6 +37,7 @@ type Filter = "all" | RowStatus;
 const NUMERIC_PREFIX = "#";
 const NO_ID_PREFIX = "(no ID)";
 const NO_RULE = "No matching rule";
+const NO_DATE = "(no date)";
 
 export function ConversionReview({
   template,
@@ -123,9 +124,62 @@ export function ConversionReview({
     });
   }
 
+  // --- Attendance date -------------------------------------------------------
+  // A file often spans more than one day because an overnight shift needs the
+  // next morning's punch to close it. Those extra days are lookup data, so the
+  // date a record belongs to decides whether it is written to the file.
+  const dateKeyCol = useMemo(() => {
+    const byRole = columns.find((c) => c.role === "date");
+    if (byRole) return byRole.key;
+    return columns.find(
+      (c) => c.mapping.kind === "direct" && c.mapping.sourceColumn === template.sourceConfiguration.dateColumn,
+    )?.key;
+  }, [columns, template.sourceConfiguration.dateColumn]);
+
+  const dateOf = useCallback(
+    (row: ConvertedRow): string => {
+      const v = dateKeyCol ? (row.cells[dateKeyCol]?.value ?? null) : null;
+      const d = parseCalendarDate(v);
+      if (!d) return NO_DATE;
+      return `${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
+    },
+    [dateKeyCol],
+  );
+
+  const dateCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of writableRows) {
+      const d = dateOf(r);
+      m.set(d, (m.get(d) ?? 0) + 1);
+    }
+    // Chronological, with undated rows last.
+    return [...m.entries()].sort((a, b) =>
+      a[0] === NO_DATE ? 1 : b[0] === NO_DATE ? -1 : a[0].localeCompare(b[0]),
+    );
+  }, [writableRows, dateOf]);
+
+  const showDateFilter = dateCounts.length >= 2;
+  const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setSelectedDates(new Set(dateCounts.map(([d]) => d)));
+  }, [dateCounts]);
+  function toggleDate(d: string, on: boolean) {
+    setSelectedDates((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(d);
+      else next.delete(d);
+      return next;
+    });
+  }
+
   const downloadRows = useMemo(
-    () => (showPrefixFilter ? result.rows.filter((r) => selectedPrefixes.has(prefixOf(r))) : result.rows),
-    [result.rows, showPrefixFilter, selectedPrefixes, prefixOf],
+    () =>
+      result.rows.filter(
+        (r) =>
+          (!showPrefixFilter || selectedPrefixes.has(prefixOf(r))) &&
+          (!showDateFilter || selectedDates.has(dateOf(r))),
+      ),
+    [result.rows, showPrefixFilter, selectedPrefixes, prefixOf, showDateFilter, selectedDates, dateOf],
   );
   const readyCount = useMemo(() => rowsForOutput(downloadRows, "valid_only", columns).length, [downloadRows, columns]);
   const exportRows = useMemo(
@@ -369,6 +423,50 @@ export function ConversionReview({
         </CardContent>
       </Card>
 
+      {showDateFilter && (
+        <Card>
+          <CardHeader className="flex-row items-center justify-between gap-3">
+            <CardTitle className="text-base">
+              Attendance dates{" "}
+              <span className="font-normal text-muted-foreground">({selectedDates.size} of {dateCounts.length})</span>
+            </CardTitle>
+            <div className="flex gap-1">
+              <Button variant="ghost" size="sm" onClick={() => setSelectedDates(new Set(dateCounts.map(([d]) => d)))}>
+                Select all
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedDates(new Set())}>
+                Clear
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              This file covers more than one day. Only the ticked dates are written to the downloaded
+              file — untick the extra day you uploaded just so overnight shifts could find the next
+              morning&apos;s punch.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {dateCounts.map(([d, count]) => {
+                const on = selectedDates.has(d);
+                return (
+                  <label
+                    key={d}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors",
+                      on ? "border-primary bg-primary/5" : "border-border",
+                    )}
+                  >
+                    <Checkbox checked={on} onCheckedChange={(c) => toggleDate(d, c === true)} />
+                    <span className="font-medium">{d === NO_DATE ? "No date" : d}</span>
+                    <span className="text-xs text-muted-foreground">({count})</span>
+                  </label>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {showPrefixFilter && (
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-3">
@@ -474,6 +572,9 @@ export function ConversionReview({
             The downloaded file uses your saved target format, worksheet, column order and filename.
             Every record with a Check-In or a Check-Out is included ({readyCount} ready and{" "}
             {includeCount - readyCount} incomplete); rows with no Check-In and no Check-Out are skipped.
+            {showDateFilter
+              ? ` Only the ${selectedDates.size} selected attendance date${selectedDates.size === 1 ? "" : "s"} are included.`
+              : ""}
             {showPrefixFilter ? " Only selected ID groups are included." : ""}
           </p>
         </CardContent>
