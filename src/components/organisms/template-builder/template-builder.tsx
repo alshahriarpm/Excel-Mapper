@@ -390,6 +390,38 @@ function StepTarget({
   );
 }
 
+/**
+ * Format-pattern field. The text is local so it can be cleared and retyped
+ * freely, but an empty pattern is never saved — a blank format would render
+ * every date/time as an empty cell. Clearing it restores the default.
+ */
+function FormatInput({
+  value,
+  fallback,
+  onCommit,
+}: {
+  value: string;
+  fallback: string;
+  onCommit: (value: string) => void;
+}) {
+  const [text, setText] = useState(value);
+  return (
+    <Input
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        if (e.target.value.trim() !== "") onCommit(e.target.value);
+      }}
+      onBlur={() => {
+        if (text.trim() === "") {
+          setText(fallback);
+          onCommit(fallback);
+        }
+      }}
+    />
+  );
+}
+
 function StepConfirm({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) => void }) {
   const dateFmt = draft.targetColumns.find((c) => c.format?.dateFormat)?.format?.dateFormat ?? "YYYY-MM-DD";
   const timeFmt = draft.targetColumns.find((c) => c.format?.timeFormat)?.format?.timeFormat ?? "h:mm AM/PM";
@@ -435,11 +467,19 @@ function StepConfirm({ draft, set }: { draft: Draft; set: (p: Partial<Draft>) =>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Target date format</Label>
-          <Input value={dateFmt} onChange={(e) => setFormat({ dateFormat: e.target.value })} />
+          <FormatInput
+            value={dateFmt}
+            fallback="YYYY-MM-DD"
+            onCommit={(dateFormat) => setFormat({ dateFormat })}
+          />
         </div>
         <div className="space-y-1.5">
           <Label>Target time format</Label>
-          <Input value={timeFmt} onChange={(e) => setFormat({ timeFormat: e.target.value })} />
+          <FormatInput
+            value={timeFmt}
+            fallback="h:mm AM/PM"
+            onCommit={(timeFormat) => setFormat({ timeFormat })}
+          />
         </div>
       </div>
     </div>

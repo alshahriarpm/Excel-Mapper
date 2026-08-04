@@ -38,7 +38,18 @@ function pad(n: number, len = 2): string {
   return String(n).padStart(len, "0");
 }
 
-export function formatDate(value: CellValue, format = "YYYY-MM-DD"): string {
+/**
+ * A missing OR blank format pattern falls back to the default. A saved template
+ * can legitimately hold "" (the format field was cleared), and an empty pattern
+ * would otherwise format every value as an empty string.
+ */
+function patternOr(format: string | undefined, fallback: string): string {
+  const f = (format ?? "").trim();
+  return f === "" ? fallback : f;
+}
+
+export function formatDate(value: CellValue, formatPattern?: string): string {
+  const format = patternOr(formatPattern, "YYYY-MM-DD");
   const d = parseCalendarDate(value);
   if (!d) return cellToString(value);
   const map: Record<string, string> = {
@@ -52,7 +63,8 @@ export function formatDate(value: CellValue, format = "YYYY-MM-DD"): string {
   return format.toUpperCase().replace(/YYYY|YY|MM|M|DD|D/g, (t) => map[t] ?? t);
 }
 
-export function formatTime(value: CellValue, format = "HH:mm"): string {
+export function formatTime(value: CellValue, formatPattern?: string): string {
+  const format = patternOr(formatPattern, "HH:mm");
   const t = parseTime(value);
   if (!t) return cellToString(value);
   const is12h = /am\/pm/i.test(format) || /\ba\/p\b/i.test(format);
@@ -75,10 +87,9 @@ export function toExcelNumFmt(
   type: TargetColumnConfiguration["detectedType"],
   format?: TargetColumnFormatLike,
 ): string | undefined {
-  if (type === "date") return (format?.dateFormat ?? "yyyy-mm-dd").toLowerCase();
+  if (type === "date") return patternOr(format?.dateFormat, "yyyy-mm-dd").toLowerCase();
   if (type === "time") {
-    const f = format?.timeFormat ?? "hh:mm";
-    return f.replace(/AM\/PM/gi, "AM/PM");
+    return patternOr(format?.timeFormat, "hh:mm").replace(/AM\/PM/gi, "AM/PM");
   }
   if (type === "number" && format?.numberFormat) return format.numberFormat;
   if (type === "text" && format?.preserveLeadingZeros) return "@";

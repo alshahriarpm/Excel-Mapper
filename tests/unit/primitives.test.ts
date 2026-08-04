@@ -6,7 +6,7 @@ import {
   parseCalendarDate,
 } from "@/lib/engine/normalize";
 import { DEFAULT_NORMALIZATION } from "@/lib/engine/types";
-import { formatDate, formatTime } from "@/lib/engine/format";
+import { formatDate, formatTime, toExcelNumFmt } from "@/lib/engine/format";
 import { evaluateFormula } from "@/lib/engine/formulaEngine";
 
 describe("Header normalization (equivalent source headers)", () => {
@@ -55,6 +55,14 @@ describe("Output formatting", () => {
     expect(formatTime("9:00 AM", "HH:mm")).toBe("09:00");
     expect(formatTime("9:00 PM", "hh:mm")).toBe("21:00");
     expect(formatTime("9:00 PM", "hh:mm AM/PM")).toBe("09:00 PM");
+  });
+  it("a blank or missing format pattern falls back to the default, never an empty cell", () => {
+    expect(formatDate("2026-07-14", "")).toBe("2026-07-14");
+    expect(formatDate("2026-07-14", "   ")).toBe("2026-07-14");
+    expect(formatDate("2026-07-14", undefined)).toBe("2026-07-14");
+    expect(formatTime("21:00", "")).toBe("21:00");
+    expect(toExcelNumFmt("date", { dateFormat: "" })).toBe("yyyy-mm-dd");
+    expect(toExcelNumFmt("time", { timeFormat: "" })).toBe("hh:mm");
   });
 });
 
