@@ -36,7 +36,7 @@ export default async function HrHome() {
           <div className="grid gap-4 sm:grid-cols-2">
             {templates.map((t) => (
               <Link key={t.id} href={`/hr/convert/${t.id}`} className="group">
-                <Card className="h-full transition-shadow hover:shadow-soft-lg">
+                <Card className="h-full transition-all hover:shadow-soft-lg dark:hover:border-primary/40">
                   <CardContent className="flex items-start gap-4 p-6">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
                       <FileSpreadsheet className="h-5 w-5" />

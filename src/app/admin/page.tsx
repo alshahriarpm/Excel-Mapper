@@ -4,6 +4,7 @@ import { Building2, FileSpreadsheet, Plus, Clock } from "lucide-react";
 import { getSessionProfile } from "@/lib/auth";
 import { listRecentConversions } from "@/lib/actions/conversions";
 import { TopBar } from "@/components/organisms/top-bar";
+import { OpenHint } from "@/components/molecules/open-hint";
 import { Card, CardContent } from "@/components/atoms/ui/card";
 
 export default async function AdminHome() {
@@ -31,13 +32,14 @@ export default async function AdminHome() {
         <div className="grid gap-4 sm:grid-cols-3">
           {actions.map((a) => (
             <Link key={a.href} href={a.href} className="group">
-              <Card className="h-full transition-shadow hover:shadow-soft-lg">
+              <Card className="h-full transition-all hover:shadow-soft-lg dark:hover:border-primary/40">
                 <CardContent className="p-6">
                   <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-accent text-accent-foreground">
                     <a.icon className="h-5 w-5" />
                   </div>
                   <h2 className="font-semibold">{a.title}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">{a.desc}</p>
+                  <OpenHint />
                 </CardContent>
               </Card>
             </Link>
